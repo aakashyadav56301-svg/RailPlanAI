@@ -1,0 +1,3372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RailPlan AI — AI-Powered Railway Route Planning Platform</title>
+
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com"></script>
+<!-- Leaflet -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- React + ReactDOM -->
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<!-- Recharts (needs PropTypes) -->
+<script crossorigin src="https://unpkg.com/prop-types@15/prop-types.min.js"></script>
+<script crossorigin src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
+<!-- App is precompiled plain JS, inlined below (no Babel, no build step) -->
+
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          navy: { DEFAULT: '#003087', 900: '#001f57', 800: '#002a73', 700: '#003087', 600: '#0a47b0' },
+          rorange: { DEFAULT: '#FF6B00', 600: '#e85f00', 400: '#ff8a33' },
+        },
+        fontFamily: { sans: ['Inter', 'system-ui', 'Segoe UI', 'sans-serif'] },
+        keyframes: {
+          fadein: { '0%': { opacity: 0, transform: 'translateY(8px)' }, '100%': { opacity: 1, transform: 'translateY(0)' } },
+          slidein: { '0%': { opacity: 0, transform: 'translateX(-12px)' }, '100%': { opacity: 1, transform: 'translateX(0)' } },
+          scalein: { '0%': { opacity: 0, transform: 'scale(.96)' }, '100%': { opacity: 1, transform: 'scale(1)' } },
+          trainmove: { '0%': { left: '-12%' }, '100%': { left: '108%' } },
+          shimmer: { '0%': { backgroundPosition: '-468px 0' }, '100%': { backgroundPosition: '468px 0' } },
+          pulseGlow: { '0%,100%': { opacity: .6 }, '50%': { opacity: 1 } },
+        },
+        animation: {
+          fadein: 'fadein .5s ease both',
+          slidein: 'slidein .4s ease both',
+          scalein: 'scalein .35s ease both',
+          trainmove: 'trainmove 2.2s linear infinite',
+          pulseGlow: 'pulseGlow 1.8s ease-in-out infinite',
+        },
+      },
+    },
+  };
+</script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+  html, body, #root { height: 100%; margin: 0; }
+  body { font-family: 'Inter', system-ui, sans-serif; background: #f1f5f9; }
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-thumb { background: #c2ccda; border-radius: 8px; }
+  ::-webkit-scrollbar-thumb:hover { background: #9aa7ba; }
+  .leaflet-container { font-family: 'Inter', sans-serif; }
+  /* railway track loader */
+  .track { position: relative; height: 6px; background: repeating-linear-gradient(90deg,#003087 0 14px,#cdd7ea 14px 22px); border-radius: 4px; overflow: hidden; }
+  .train { position: absolute; top: -9px; width: 56px; height: 22px; }
+  .shine { background: linear-gradient(90deg,#e9eef6 0%,#f7f9fc 20%,#e9eef6 40%); background-size: 800px 100%; animation: shimmer 1.4s infinite linear; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+"use strict";
+
+function ownKeys(e, r) { var t = Object.keys(e); if (Object.getOwnPropertySymbols) { var o = Object.getOwnPropertySymbols(e); r && (o = o.filter(function (r) { return Object.getOwnPropertyDescriptor(e, r).enumerable; })), t.push.apply(t, o); } return t; }
+function _objectSpread(e) { for (var r = 1; r < arguments.length; r++) { var t = null != arguments[r] ? arguments[r] : {}; r % 2 ? ownKeys(Object(t), !0).forEach(function (r) { _defineProperty(e, r, t[r]); }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function (r) { Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r)); }); } return e; }
+function _defineProperty(e, r, t) { return (r = _toPropertyKey(r)) in e ? Object.defineProperty(e, r, { value: t, enumerable: !0, configurable: !0, writable: !0 }) : e[r] = t, e; }
+function _toPropertyKey(t) { var i = _toPrimitive(t, "string"); return "symbol" == typeof i ? i : i + ""; }
+function _toPrimitive(t, r) { if ("object" != typeof t || !t) return t; var e = t[Symbol.toPrimitive]; if (void 0 !== e) { var i = e.call(t, r || "default"); if ("object" != typeof i) return i; throw new TypeError("@@toPrimitive must return a primitive value."); } return ("string" === r ? String : Number)(t); }
+function _slicedToArray(r, e) { return _arrayWithHoles(r) || _iterableToArrayLimit(r, e) || _unsupportedIterableToArray(r, e) || _nonIterableRest(); }
+function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
+function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) return _arrayLikeToArray(r, a); var t = {}.toString.call(r).slice(8, -1); return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0; } }
+function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length); for (var e = 0, n = Array(a); e < a; e++) n[e] = r[e]; return n; }
+function _iterableToArrayLimit(r, l) { var t = null == r ? null : "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (null != t) { var e, n, i, u, a = [], f = !0, o = !1; try { if (i = (t = t.call(r)).next, 0 === l) { if (Object(t) !== t) return; f = !1; } else for (; !(f = (e = i.call(t)).done) && (a.push(e.value), a.length !== l); f = !0); } catch (r) { o = !0, n = r; } finally { try { if (!f && null != t.return && (u = t.return(), Object(u) !== u)) return; } finally { if (o) throw n; } } return a; } }
+function _arrayWithHoles(r) { if (Array.isArray(r)) return r; }
+const _React = React,
+  useState = _React.useState,
+  useEffect = _React.useEffect,
+  useRef = _React.useRef,
+  useMemo = _React.useMemo;
+const RC = window.Recharts || {};
+
+/* ============================ Utilities ============================ */
+const API = "http://localhost:8000";
+
+// Indian number format (lakh/crore grouping for plain numbers)
+function inFormat(n) {
+  if (n === null || n === undefined || isNaN(n)) return "—";
+  const x = Math.round(n).toString();
+  let int = x;
+  let lastThree = int.slice(-3);
+  let other = int.slice(0, -3);
+  if (other !== "") lastThree = "," + lastThree;
+  return other.replace(/\B(?=(\d{2})+(?!\d))/g, ",") + lastThree;
+}
+const cr = n => "₹" + inFormat(n) + " Cr";
+async function apiGet(path, fallback) {
+  try {
+    const r = await fetch(API + path, {
+      signal: AbortSignal.timeout(1200)
+    });
+    if (!r.ok) throw 0;
+    return await r.json();
+  } catch (e) {
+    return fallback;
+  }
+}
+async function apiPost(path, body, fallback) {
+  try {
+    const r = await fetch(API + path, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(1500)
+    });
+    if (!r.ok) throw 0;
+    return await r.json();
+  } catch (e) {
+    return fallback;
+  }
+}
+
+// Try backend file download; fall back to a client-generated file so the demo
+// always produces a real download even with no backend running.
+async function downloadFile(path, filename, fallback) {
+  try {
+    const r = await fetch(API + path, {
+      signal: AbortSignal.timeout(2500)
+    });
+    if (!r.ok) throw 0;
+    const blob = await r.blob();
+    triggerDownload(URL.createObjectURL(blob), filename);
+    return "backend";
+  } catch (e) {
+    if (fallback) {
+      triggerDownload(fallback(), filename);
+      return "fallback";
+    }
+    return "failed";
+  }
+}
+function triggerDownload(url, filename) {
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    a.remove();
+  }, 100);
+}
+function dataUrl(content, mime) {
+  return "data:" + mime + ";charset=utf-8," + encodeURIComponent(content);
+}
+function boqCsvFallback() {
+  const head = "Sr,Item,Unit,Qty,Rate (Rs.),Amount (Rs. Cr)\n";
+  const rows = BOQ.map(r => r.map(c => "\"".concat(c, "\"")).join(",")).join("\n");
+  return dataUrl(head + rows, "text/csv");
+}
+function kmlFallback() {
+  const wp = [[21.2514, 81.6296, "Raipur"], [21.0900, 81.5400, "Abhanpur"], [21.1450, 81.3900, "Dharsiwa"], [21.1900, 81.2833, "Durg"]];
+  const line = wp.map(_ref => {
+    let _ref2 = _slicedToArray(_ref, 2),
+      la = _ref2[0],
+      lo = _ref2[1];
+    return "".concat(lo, ",").concat(la, ",0");
+  }).join(" ");
+  const pms = wp.map(_ref3 => {
+    let _ref4 = _slicedToArray(_ref3, 3),
+      la = _ref4[0],
+      lo = _ref4[1],
+      n = _ref4[2];
+    return "<Placemark><name>".concat(n, "</name><Point><coordinates>").concat(lo, ",").concat(la, ",0</coordinates></Point></Placemark>");
+  }).join("");
+  const kml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<kml xmlns=\"http://www.opengis.net/kml/2.2\"><Document><name>RailPlan AI - Raipur-Durg</name><Style id=\"r\"><LineStyle><color>ff00cc4c</color><width>4</width></LineStyle></Style><Placemark><name>Route B - AI Optimized</name><styleUrl>#r</styleUrl><LineString><tessellate>1</tessellate><coordinates>".concat(line, "</coordinates></LineString></Placemark>").concat(pms, "</Document></kml>");
+  return dataUrl(kml, "application/vnd.google-earth.kml+xml");
+}
+
+/* ============================ Mock Data ============================ */
+const MOCK_PROJECTS = [{
+  id: 3,
+  name: "Bilaspur-Korba Link",
+  zone: "South East Central",
+  status: "Completed",
+  priority: "Time",
+  length_km: 102.6,
+  cost_cr: 2980,
+  cost_saved_cr: 488,
+  description: "Completed 102 km doubling and electrification project serving the Korba coalfields and NTPC power plants.",
+  start_lat: 22.0797,
+  start_lng: 82.1391,
+  end_lat: 22.3595,
+  end_lng: 82.7501,
+  created_at: "2025-11-02"
+}, {
+  id: 2,
+  name: "Nagpur-Amravati New Line",
+  zone: "Central",
+  status: "Planning",
+  priority: "Environment",
+  length_km: 154.2,
+  cost_cr: 4820,
+  cost_saved_cr: 905,
+  description: "Proposed 154 km greenfield line connecting Nagpur and Amravati to boost regional connectivity and cotton freight.",
+  start_lat: 21.1458,
+  start_lng: 79.0882,
+  end_lat: 20.9374,
+  end_lng: 77.7796,
+  created_at: "2026-02-18"
+}, {
+  id: 1,
+  name: "Raipur-Durg Bypass Line",
+  zone: "South East Central",
+  status: "Active",
+  priority: "Cost",
+  length_km: 38.4,
+  cost_cr: 1240,
+  cost_saved_cr: 312,
+  description: "A 38 km broad-gauge bypass to decongest Raipur Junction and improve freight throughput on the Mumbai–Howrah corridor.",
+  start_lat: 21.2514,
+  start_lng: 81.6296,
+  end_lat: 21.1904,
+  end_lng: 81.2849,
+  created_at: "2026-05-09"
+}];
+const ZONES = ["South East Central", "Central", "Northern", "Eastern", "Western", "Southern", "North Eastern", "East Coast", "West Central", "South Western"];
+const AI_INSIGHTS = [{
+  type: "alert",
+  icon: "🌊",
+  title: "River crossing flagged",
+  text: "Proposed Nagpur–Amravati alignment intersects the Wardha river at km 62. Suggest a 1.2 km viaduct to cut earthwork by ₹84 Cr."
+}, {
+  type: "tip",
+  icon: "🌳",
+  title: "Forest avoidance",
+  text: "Re-routing 4.5 km around the Sitanadi reserve avoids 18 hectares of forest clearance and Stage-II FCA delay."
+}, {
+  type: "success",
+  icon: "📉",
+  title: "Gradient optimised",
+  text: "AI flattened ruling gradient to 1-in-200 on Raipur–Durg, improving freight haulage capacity by ~14%."
+}];
+const LOADING_MSGS = ["Analyzing terrain...", "Calculating optimal route...", "Evaluating gradient & curvature...", "Scanning forest & water clearances...", "Estimating earthwork & bridges...", "Optimising cost vs environment...", "Generating alignment geometry..."];
+
+/* ---- Phase 2: AI working steps ---- */
+const AI_STEPS = [{
+  label: "Loading GIS data...",
+  dur: 1000,
+  icon: "🗺"
+}, {
+  label: "Analyzing terrain elevation...",
+  dur: 1500,
+  icon: "⛰"
+}, {
+  label: "Detecting rivers and water bodies...",
+  dur: 1000,
+  icon: "🌊"
+}, {
+  label: "Checking forest boundaries...",
+  dur: 1000,
+  icon: "🌲"
+}, {
+  label: "Running AI optimization algorithm...",
+  dur: 2000,
+  icon: "🤖"
+}, {
+  label: "Calculating construction costs...",
+  dur: 1000,
+  icon: "💰"
+}, {
+  label: "Generating 3 optimal routes...",
+  dur: 1000,
+  icon: "🛤"
+}];
+
+/* ---- Phase 2: 3 hardcoded demo routes (Raipur → Durg) ---- */
+const ROUTE_DATA = [{
+  id: "A",
+  name: "Shortest Path",
+  color: "#2196F3",
+  recommended: false,
+  waypoints: [[21.2514, 81.6296], [21.6833, 81.5667], [21.7167, 81.9500], [21.1900, 81.2833]],
+  wpNames: ["Raipur", "Tilda", "Bhatapara", "Durg"],
+  distance_km: 67.3,
+  cost_cr: 1456,
+  bridges_major: 8,
+  bridges_minor: 14,
+  tunnels: 0,
+  forest_sqkm: 2.3,
+  land_ha: 487,
+  gradient: "1:87",
+  grad_val: 87,
+  grad_status: "warn",
+  grad_label: "Steep"
+}, {
+  id: "B",
+  name: "AI Optimized",
+  color: "#4CAF50",
+  recommended: true,
+  waypoints: [[21.2514, 81.6296], [21.0900, 81.5400], [21.1450, 81.3900], [21.1900, 81.2833]],
+  wpNames: ["Raipur", "Abhanpur", "Dharsiwa", "Durg"],
+  distance_km: 71.8,
+  cost_cr: 1298,
+  bridges_major: 5,
+  bridges_minor: 9,
+  tunnels: 0,
+  forest_sqkm: 0.8,
+  land_ha: 423,
+  gradient: "1:120",
+  grad_val: 120,
+  grad_status: "good",
+  grad_label: "Good"
+}, {
+  id: "C",
+  name: "Eco-Friendly",
+  color: "#FF9800",
+  recommended: false,
+  waypoints: [[21.2514, 81.6296], [21.3300, 81.4500], [21.2600, 81.3300], [21.1900, 81.2833]],
+  wpNames: ["Raipur", "Mandhar", "Sirsia", "Durg"],
+  distance_km: 79.2,
+  cost_cr: 1512,
+  bridges_major: 4,
+  bridges_minor: 7,
+  tunnels: 0,
+  forest_sqkm: 0.2,
+  land_ha: 398,
+  gradient: "1:135",
+  grad_val: 135,
+  grad_status: "good",
+  grad_label: "Gentle"
+}];
+
+// Elevation profiles — Route B is the smoothest; Route A has a steep red section.
+function buildElevation() {
+  const pts = [];
+  for (let d = 0; d <= 80; d += 2) {
+    const a = d <= 67.3 ? 288 + 55 * Math.sin(d / 9) + 22 * Math.sin(d / 3.2) + (d > 30 && d < 42 ? 48 : 0) : null;
+    const b = d <= 71.8 ? 286 + 26 * Math.sin(d / 15) + 7 * Math.sin(d / 7) : null;
+    const c = d <= 79.2 ? 290 + 42 * Math.sin(d / 11) + 11 * Math.cos(d / 4.5) : null;
+    const steep = d > 30 && d < 42 && a != null ? Math.round(a) : null; // red highlight on A
+    pts.push({
+      d,
+      a: a == null ? null : Math.round(a),
+      b: b == null ? null : Math.round(b),
+      c: c == null ? null : Math.round(c),
+      steep
+    });
+  }
+  return pts;
+}
+const ELEVATION = buildElevation();
+const MINI_ANALYSIS = [{
+  icon: "🏔️",
+  title: "Terrain",
+  text: "Mostly flat, 2 gentle slopes detected",
+  accent: "bg-amber-50 text-amber-600"
+}, {
+  icon: "💧",
+  title: "Hydrology",
+  text: "12 water crossings identified",
+  accent: "bg-sky-50 text-sky-600"
+}, {
+  icon: "🌳",
+  title: "Forest",
+  text: "Route B saves 340 hectares of forest",
+  accent: "bg-emerald-50 text-emerald-600"
+}, {
+  icon: "💰",
+  title: "Cost Saving",
+  text: "Route B saves ₹214 Crores vs Route A",
+  accent: "bg-violet-50 text-violet-600"
+}];
+
+/* ============================ Phase 3 data ============================ */
+const COST_SPLIT = [{
+  head: "Track & Earthwork",
+  amount: 387,
+  pct: 29.8,
+  color: "#003087"
+}, {
+  head: "Bridges & Structures",
+  amount: 234,
+  pct: 18.0,
+  color: "#FF6B00"
+}, {
+  head: "Land Acquisition",
+  amount: 312,
+  pct: 24.0,
+  color: "#10b981"
+}, {
+  head: "Electrification",
+  amount: 187,
+  pct: 14.4,
+  color: "#8b5cf6"
+}, {
+  head: "Signalling & Telecom",
+  amount: 98,
+  pct: 7.5,
+  color: "#0ea5e9"
+}, {
+  head: "Miscellaneous",
+  amount: 80,
+  pct: 6.3,
+  color: "#64748b"
+}];
+const TOTAL_COST = 1298;
+const ROUTE_COSTS = [{
+  id: "A",
+  name: "Shortest Path",
+  cost: 1456,
+  color: "#2196F3"
+}, {
+  id: "B",
+  name: "AI Optimized",
+  cost: 1298,
+  color: "#4CAF50"
+}, {
+  id: "C",
+  name: "Eco-Friendly",
+  cost: 1512,
+  color: "#FF9800"
+}];
+const BOQ = [["1", "Site clearance and grubbing", "Sqm", "4,28,000", "18", "0.77"], ["2", "Earthwork in embankment formation", "Cum", "18,60,000", "285", "53.01"], ["3", "Earthwork in cutting (soil)", "Cum", "9,40,000", "240", "22.56"], ["4", "Blanketing material (sub-ballast)", "Cum", "2,15,000", "1,150", "24.73"], ["5", "Supply & spreading of ballast", "Cum", "1,72,000", "1,980", "34.06"], ["6", "PSC sleepers (broad gauge)", "Nos", "1,19,000", "2,850", "33.92"], ["7", "60 kg/m, 90 UTS rails", "MT", "9,800", "68,000", "66.64"], ["8", "Laying & linking of track (LWR)", "Km", "143", "42,50,000", "60.78"], ["9", "Major bridges (5 nos)", "Nos", "5", "18,60,00,000", "93.00"], ["10", "Minor bridges & culverts (9 nos)", "Nos", "9", "3,20,00,000", "28.80"], ["11", "Road over / under bridges (4 nos)", "Nos", "4", "6,75,00,000", "27.00"], ["12", "Station buildings (4 stations)", "Nos", "4", "8,50,00,000", "34.00"], ["13", "Platforms, FOB & amenities", "LS", "1", "24,00,00,000", "24.00"], ["14", "OHE / 25 kV AC electrification", "Km", "143", "1,05,00,000", "150.15"], ["15", "Traction substations (2 nos)", "Nos", "2", "18,50,00,000", "37.00"], ["16", "Electronic interlocking & signalling", "Km", "71.8", "85,00,000", "61.03"], ["17", "Optical fibre & telecom", "Km", "71.8", "18,50,000", "13.28"], ["18", "Land acquisition & compensation", "Hect", "215.4", "1,44,84,000", "312.00"], ["19", "Environmental mitigation", "LS", "1", "12,00,00,000", "12.00"], ["20", "Contingencies & general charges", "LS", "1", "84,00,00,000", "84.00"]];
+const BRIDGES = [["MB-1", "Km 6.4", "Kharun River", "4 x 30.5 m", "PSC Girder", "24.5"], ["MB-2", "Km 18.2", "Seonath Tributary", "3 x 24.0 m", "RCC Box", "16.8"], ["MB-3", "Km 34.6", "Amner Nala", "5 x 30.5 m", "PSC Girder", "28.2"], ["MB-4", "Km 52.1", "Seonath River", "6 x 45.7 m", "Steel Truss", "78.4"], ["MB-5", "Km 64.8", "Tandula Canal", "2 x 24.0 m", "RCC Box", "11.6"]];
+const LAND_USE = [{
+  type: "Agricultural",
+  pct: 58,
+  ha: 124.9,
+  color: "#16a34a"
+}, {
+  type: "Government",
+  pct: 27,
+  ha: 58.2,
+  color: "#003087"
+}, {
+  type: "Forest",
+  pct: 10,
+  ha: 21.5,
+  color: "#15803d"
+}, {
+  type: "Built-up",
+  pct: 5,
+  ha: 10.8,
+  color: "#FF6B00"
+}];
+const LAND_SUMMARY = {
+  total_ha: 215.4,
+  villages: ["Dharsiwa", "Mandhar", "Sirsia", "Kurud"],
+  households: 234,
+  compensation_cr: 312,
+  timeline: "18–24 months"
+};
+const TIMELINE = [{
+  phase: "Phase 1: Survey & DPR",
+  months: 6,
+  start: 0,
+  color: "#003087"
+}, {
+  phase: "Phase 2: Land Acquisition",
+  months: 18,
+  start: 6,
+  color: "#FF6B00"
+}, {
+  phase: "Phase 3: Civil Construction",
+  months: 36,
+  start: 12,
+  color: "#10b981"
+}, {
+  phase: "Phase 4: Track Laying",
+  months: 12,
+  start: 48,
+  color: "#8b5cf6"
+}, {
+  phase: "Phase 5: Electrification",
+  months: 8,
+  start: 54,
+  color: "#0ea5e9"
+}, {
+  phase: "Phase 6: Testing & Commissioning",
+  months: 6,
+  start: 62,
+  color: "#f59e0b"
+}];
+const TIMELINE_TOTAL = 68; // months on the chart axis
+const DPR_INSIGHTS = [{
+  icon: "🌳",
+  text: "Route B reduces deforestation by 65%",
+  accent: "bg-emerald-50 text-emerald-600"
+}, {
+  icon: "⛏️",
+  text: "Earthwork reduced by 2.3 lakh cum vs Route A",
+  accent: "bg-amber-50 text-amber-600"
+}, {
+  icon: "📈",
+  text: "Estimated ROI positive in 12 years",
+  accent: "bg-violet-50 text-violet-600"
+}];
+
+/* ============================ Shared UI ============================ */
+function Logo(_ref5) {
+  let _ref5$size = _ref5.size,
+    size = _ref5$size === void 0 ? 40 : _ref5$size;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-3 select-none"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: size,
+      height: size
+    },
+    className: "relative rounded-xl bg-gradient-to-br from-navy to-navy-600 shadow-lg flex items-center justify-center ring-2 ring-rorange/40"
+  }, /*#__PURE__*/React.createElement("svg", {
+    viewBox: "0 0 24 24",
+    width: size * 0.6,
+    height: size * 0.6,
+    fill: "none"
+  }, /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "12",
+    r: "9",
+    stroke: "#FF6B00",
+    strokeWidth: "2"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M7 12h10M12 7v10",
+    stroke: "#fff",
+    strokeWidth: "1.6",
+    strokeLinecap: "round"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "12",
+    r: "2.4",
+    fill: "#FF6B00"
+  }))));
+}
+function Spinner(_ref6) {
+  let label = _ref6.label;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col items-center gap-5 py-8"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "relative w-16 h-16"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "absolute inset-0 rounded-full border-4 border-navy/15"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "absolute inset-0 rounded-full border-4 border-transparent border-t-rorange animate-spin"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "absolute inset-0 flex items-center justify-center text-2xl"
+  }, "\uD83D\uDE86")), /*#__PURE__*/React.createElement("div", {
+    className: "text-navy font-semibold tracking-wide animate-pulse"
+  }, label));
+}
+function StatusBadge(_ref7) {
+  let status = _ref7.status;
+  const map = {
+    Active: "bg-emerald-100 text-emerald-700 ring-emerald-200",
+    Completed: "bg-blue-100 text-blue-700 ring-blue-200",
+    Planning: "bg-amber-100 text-amber-700 ring-amber-200"
+  };
+  return /*#__PURE__*/React.createElement("span", {
+    className: "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ring-1 ".concat(map[status] || "bg-slate-100 text-slate-600 ring-slate-200")
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "w-1.5 h-1.5 rounded-full ".concat(status === "Active" ? "bg-emerald-500 animate-pulse" : status === "Completed" ? "bg-blue-500" : "bg-amber-500")
+  }), status);
+}
+
+/* ============================ Login ============================ */
+function Login(_ref8) {
+  let onLogin = _ref8.onLogin;
+  const _useState = useState("Engineer"),
+    _useState2 = _slicedToArray(_useState, 2),
+    u = _useState2[0],
+    setU = _useState2[1];
+  const _useState3 = useState("admin123"),
+    _useState4 = _slicedToArray(_useState3, 2),
+    p = _useState4[0],
+    setP = _useState4[1];
+  const _useState5 = useState(""),
+    _useState6 = _slicedToArray(_useState5, 2),
+    err = _useState6[0],
+    setErr = _useState6[1];
+  const _useState7 = useState(false),
+    _useState8 = _slicedToArray(_useState7, 2),
+    busy = _useState8[0],
+    setBusy = _useState8[1];
+  const submit = async e => {
+    e.preventDefault();
+    setErr("");
+    setBusy(true);
+    await new Promise(r => setTimeout(r, 700));
+    const res = await apiPost("/api/login", {
+      username: u,
+      password: p
+    }, u === "Engineer" && p === "admin123" ? {
+      token: "demo",
+      user: {
+        name: "Engineer"
+      }
+    } : null);
+    setBusy(false);
+    if (res && res.token) onLogin(res.user || {
+      name: u
+    });else setErr("Invalid credentials. Use the demo login below.");
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "min-h-screen flex animate-fadein"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "hidden lg:flex w-1/2 relative overflow-hidden bg-gradient-to-b from-[#0a1f4d] via-navy to-navy-600"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "absolute top-10 right-16 w-40 h-40 rounded-full bg-rorange/30 blur-3xl"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "absolute top-20 right-24 w-20 h-20 rounded-full bg-rorange/80 blur-xl"
+  }), Array.from({
+    length: 30
+  }).map((_, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    className: "absolute bg-white rounded-full animate-pulseGlow",
+    style: {
+      width: 2,
+      height: 2,
+      top: "".concat(Math.random() * 45, "%"),
+      left: "".concat(Math.random() * 100, "%"),
+      animationDelay: "".concat(Math.random() * 2, "s")
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "absolute bottom-0 w-full h-44",
+    style: {
+      background: "radial-gradient(120% 100% at 20% 100%, #0c2c66 0, transparent 60%), radial-gradient(120% 100% at 80% 100%, #0c2c66 0, transparent 60%)"
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "absolute bottom-24 left-0 w-full"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "relative mx-6 h-28"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "absolute bottom-6 left-0 w-full h-3 bg-slate-300 rounded shadow-lg"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "absolute bottom-2 left-0 w-full h-2 bg-slate-500 rounded"
+  }), [12, 38, 62, 88].map(x => /*#__PURE__*/React.createElement("div", {
+    key: x,
+    className: "absolute bottom-0 w-3 h-8 bg-slate-600",
+    style: {
+      left: "".concat(x, "%")
+    }
+  })), /*#__PURE__*/React.createElement("svg", {
+    className: "absolute bottom-9 left-0 w-full h-20",
+    viewBox: "0 0 400 80",
+    preserveAspectRatio: "none"
+  }, Array.from({
+    length: 16
+  }).map((_, i) => /*#__PURE__*/React.createElement("path", {
+    key: i,
+    d: "M".concat(i * 25, ",70 L").concat(i * 25 + 12.5, ",6 L").concat(i * 25 + 25, ",70"),
+    stroke: "#FF6B00",
+    strokeWidth: "2.2",
+    fill: "none",
+    opacity: "0.9"
+  })), /*#__PURE__*/React.createElement("line", {
+    x1: "0",
+    y1: "6",
+    x2: "400",
+    y2: "6",
+    stroke: "#ff8a33",
+    strokeWidth: "2"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "0",
+    y1: "70",
+    x2: "400",
+    y2: "70",
+    stroke: "#cbd5e1",
+    strokeWidth: "2"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "absolute bottom-9",
+    style: {
+      animation: 'trainmove 4s linear infinite'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-end gap-1"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "w-10 h-6 rounded-t-lg bg-rorange shadow-lg"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "w-8 h-5 rounded bg-amber-300"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "w-8 h-5 rounded bg-amber-300"
+  }))))), /*#__PURE__*/React.createElement("div", {
+    className: "absolute bottom-0 w-full h-24 bg-gradient-to-b from-navy-600 to-[#06163a] opacity-80"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "relative z-10 p-14 flex flex-col justify-center text-white"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-3 mb-6"
+  }, /*#__PURE__*/React.createElement(Logo, {
+    size: 52
+  }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "text-3xl font-black tracking-tight"
+  }, "RailPlan ", /*#__PURE__*/React.createElement("span", {
+    className: "text-rorange"
+  }, "AI")))), /*#__PURE__*/React.createElement("h1", {
+    className: "text-4xl font-extrabold leading-tight max-w-md"
+  }, "Plan smarter railway routes with Artificial Intelligence."), /*#__PURE__*/React.createElement("p", {
+    className: "mt-4 text-blue-100/80 max-w-md text-lg"
+  }, "Terrain-aware alignment, automated DPRs, and cost optimisation for Indian Railways engineers."), /*#__PURE__*/React.createElement("div", {
+    className: "mt-8 flex gap-6 text-sm text-blue-100/70"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "text-2xl font-bold text-white"
+  }, "\u20B92,840 Cr"), "saved vs manual"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "text-2xl font-bold text-white"
+  }, "47"), "routes analysed"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "text-2xl font-bold text-white"
+  }, "12"), "active projects")))), /*#__PURE__*/React.createElement("div", {
+    className: "flex-1 flex items-center justify-center p-8 bg-white"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "w-full max-w-sm animate-scalein"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "lg:hidden flex items-center gap-3 mb-8"
+  }, /*#__PURE__*/React.createElement(Logo, null), /*#__PURE__*/React.createElement("div", {
+    className: "text-2xl font-black text-navy"
+  }, "RailPlan ", /*#__PURE__*/React.createElement("span", {
+    className: "text-rorange"
+  }, "AI"))), /*#__PURE__*/React.createElement("span", {
+    className: "inline-block px-3 py-1 rounded-full bg-orange-50 text-rorange text-xs font-bold tracking-wide ring-1 ring-orange-200 mb-4"
+  }, "INDIAN RAILWAYS \xB7 DEMO"), /*#__PURE__*/React.createElement("h2", {
+    className: "text-3xl font-extrabold text-navy"
+  }, "Welcome back"), /*#__PURE__*/React.createElement("p", {
+    className: "text-slate-500 mt-1 mb-8"
+  }, "AI-Powered Railway Route Planning Platform"), /*#__PURE__*/React.createElement("form", {
+    onSubmit: submit,
+    className: "space-y-4"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    className: "text-sm font-semibold text-slate-700"
+  }, "Username"), /*#__PURE__*/React.createElement("input", {
+    value: u,
+    onChange: e => setU(e.target.value),
+    className: "mt-1 w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-navy focus:ring-2 focus:ring-navy/20 outline-none transition",
+    placeholder: "Engineer"
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    className: "text-sm font-semibold text-slate-700"
+  }, "Password"), /*#__PURE__*/React.createElement("input", {
+    type: "password",
+    value: p,
+    onChange: e => setP(e.target.value),
+    className: "mt-1 w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-navy focus:ring-2 focus:ring-navy/20 outline-none transition",
+    placeholder: "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
+  })), err && /*#__PURE__*/React.createElement("div", {
+    className: "text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2"
+  }, err), /*#__PURE__*/React.createElement("button", {
+    disabled: busy,
+    className: "w-full py-3 rounded-xl bg-gradient-to-r from-navy to-navy-600 hover:from-navy-600 hover:to-navy text-white font-bold shadow-lg shadow-navy/20 transition active:scale-[.98] disabled:opacity-70"
+  }, busy ? "Signing in..." : "Sign In →")), /*#__PURE__*/React.createElement("div", {
+    className: "mt-6 rounded-xl border border-dashed border-orange-300 bg-orange-50/60 p-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-xs font-bold text-rorange uppercase tracking-wide mb-1"
+  }, "Demo Credentials"), /*#__PURE__*/React.createElement("div", {
+    className: "text-sm text-slate-700 font-mono"
+  }, "Engineer\xA0/\xA0admin123")), /*#__PURE__*/React.createElement("p", {
+    className: "text-center text-xs text-slate-400 mt-8"
+  }, "\xA9 2026 RailPlan AI \xB7 Built for Indian Railways"))));
+}
+
+/* ============================ Sidebar ============================ */
+function Sidebar(_ref9) {
+  let page = _ref9.page,
+    setPage = _ref9.setPage,
+    onLogout = _ref9.onLogout,
+    user = _ref9.user;
+  const items = [{
+    id: "dashboard",
+    label: "Dashboard",
+    icon: "▦"
+  }, {
+    id: "newproject",
+    label: "New Project",
+    icon: "✚"
+  }, {
+    id: "map",
+    label: "GIS Map Viewer",
+    icon: "🗺"
+  }, {
+    id: "routes",
+    label: "Route Analysis",
+    icon: "🧭"
+  }, {
+    id: "dpr",
+    label: "DPR Generator",
+    icon: "📄"
+  }];
+  return /*#__PURE__*/React.createElement("aside", {
+    className: "w-64 shrink-0 bg-navy-900 text-white flex flex-col h-screen sticky top-0"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "p-5 flex items-center gap-3 border-b border-white/10"
+  }, /*#__PURE__*/React.createElement(Logo, {
+    size: 40
+  }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "text-lg font-black leading-none"
+  }, "RailPlan ", /*#__PURE__*/React.createElement("span", {
+    className: "text-rorange"
+  }, "AI")), /*#__PURE__*/React.createElement("div", {
+    className: "text-[10px] text-blue-200/60 mt-1 tracking-widest"
+  }, "ROUTE PLANNING"))), /*#__PURE__*/React.createElement("nav", {
+    className: "flex-1 p-3 space-y-1 overflow-y-auto"
+  }, items.map(it => /*#__PURE__*/React.createElement("button", {
+    key: it.id,
+    onClick: () => setPage(it.id),
+    className: "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition group\n              ".concat(page === it.id ? "bg-rorange text-white shadow-lg shadow-rorange/20" : "text-blue-100/70 hover:bg-white/10 hover:text-white")
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-base w-5 text-center"
+  }, it.icon), it.label))), /*#__PURE__*/React.createElement("div", {
+    className: "p-3 border-t border-white/10"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-3 px-2 py-2 mb-2"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "w-9 h-9 rounded-full bg-gradient-to-br from-rorange to-rorange-400 flex items-center justify-center font-bold"
+  }, "E"), /*#__PURE__*/React.createElement("div", {
+    className: "text-sm"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "font-semibold"
+  }, (user === null || user === void 0 ? void 0 : user.name) || "Engineer"), /*#__PURE__*/React.createElement("div", {
+    className: "text-[11px] text-blue-200/60"
+  }, "Route Planner"))), /*#__PURE__*/React.createElement("button", {
+    onClick: onLogout,
+    className: "w-full text-left px-4 py-2.5 rounded-xl text-sm text-blue-100/70 hover:bg-white/10 hover:text-white transition"
+  }, "\u21A9 Sign Out")));
+}
+function TopBar(_ref0) {
+  let title = _ref0.title,
+    subtitle = _ref0.subtitle,
+    children = _ref0.children;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between mb-6 animate-slidein"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h1", {
+    className: "text-2xl font-extrabold text-navy"
+  }, title), subtitle && /*#__PURE__*/React.createElement("p", {
+    className: "text-slate-500 text-sm mt-0.5"
+  }, subtitle)), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-3"
+  }, children));
+}
+
+/* ============================ Dashboard ============================ */
+function StatCard(_ref1) {
+  let icon = _ref1.icon,
+    label = _ref1.label,
+    value = _ref1.value,
+    accent = _ref1.accent,
+    sub = _ref1.sub,
+    delay = _ref1.delay;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-2xl p-5 shadow-sm ring-1 ring-slate-100 hover:shadow-md hover:-translate-y-0.5 transition animate-fadein",
+    style: {
+      animationDelay: "".concat(delay, "ms")
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "w-11 h-11 rounded-xl flex items-center justify-center text-xl ".concat(accent)
+  }, icon), /*#__PURE__*/React.createElement("span", {
+    className: "text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full"
+  }, "\u25B2 live")), /*#__PURE__*/React.createElement("div", {
+    className: "mt-4 text-3xl font-extrabold text-navy tabular-nums"
+  }, value), /*#__PURE__*/React.createElement("div", {
+    className: "text-sm text-slate-500 mt-1"
+  }, label), sub && /*#__PURE__*/React.createElement("div", {
+    className: "text-[11px] text-slate-400 mt-2"
+  }, sub));
+}
+function Dashboard(_ref10) {
+  let setPage = _ref10.setPage,
+    openProject = _ref10.openProject,
+    onGenerate = _ref10.onGenerate;
+  const _useState9 = useState(null),
+    _useState0 = _slicedToArray(_useState9, 2),
+    stats = _useState0[0],
+    setStats = _useState0[1];
+  const _useState1 = useState([]),
+    _useState10 = _slicedToArray(_useState1, 2),
+    projects = _useState10[0],
+    setProjects = _useState10[1];
+  const _useState11 = useState(true),
+    _useState12 = _slicedToArray(_useState11, 2),
+    loading = _useState12[0],
+    setLoading = _useState12[1];
+  useEffect(() => {
+    (async () => {
+      const s = await apiGet("/api/stats", {
+        total_projects: 12,
+        routes_analyzed: 47,
+        cost_saved_cr: 2840,
+        dprs_generated: 8
+      });
+      const p = await apiGet("/api/projects", MOCK_PROJECTS);
+      setStats(s);
+      setProjects(p);
+      setLoading(false);
+    })();
+  }, []);
+  const trend = [{
+    m: "Jan",
+    saved: 180,
+    routes: 4
+  }, {
+    m: "Feb",
+    saved: 320,
+    routes: 7
+  }, {
+    m: "Mar",
+    saved: 540,
+    routes: 11
+  }, {
+    m: "Apr",
+    saved: 980,
+    routes: 19
+  }, {
+    m: "May",
+    saved: 1640,
+    routes: 31
+  }, {
+    m: "Jun",
+    saved: 2840,
+    routes: 47
+  }];
+  const mix = [{
+    name: "Cost",
+    value: 5,
+    fill: "#003087"
+  }, {
+    name: "Time",
+    value: 4,
+    fill: "#FF6B00"
+  }, {
+    name: "Environment",
+    value: 3,
+    fill: "#10b981"
+  }];
+  if (loading) return /*#__PURE__*/React.createElement("div", {
+    className: "grid place-items-center h-[70vh]"
+  }, /*#__PURE__*/React.createElement(Spinner, {
+    label: "Loading dashboard..."
+  }));
+  const AreaChart = RC.AreaChart,
+    Area = RC.Area,
+    ResponsiveContainer = RC.ResponsiveContainer,
+    XAxis = RC.XAxis,
+    YAxis = RC.YAxis,
+    Tooltip = RC.Tooltip,
+    CartesianGrid = RC.CartesianGrid,
+    PieChart = RC.PieChart,
+    Pie = RC.Pie,
+    Cell = RC.Cell,
+    Legend = RC.Legend,
+    BarChart = RC.BarChart,
+    Bar = RC.Bar;
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(TopBar, {
+    title: "Dashboard",
+    subtitle: "Overview of all railway route planning activity"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setPage("newproject"),
+    className: "px-4 py-2.5 rounded-xl bg-rorange hover:bg-rorange-600 text-white font-semibold text-sm shadow-lg shadow-rorange/20 transition active:scale-95"
+  }, "\u271A New Project"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => onGenerate({
+      name: "Raipur → Durg Corridor"
+    }),
+    className: "px-4 py-2.5 rounded-xl bg-navy hover:bg-navy-600 text-white font-semibold text-sm transition active:scale-95"
+  }, "\uD83E\uDD16 Generate Routes"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setPage("map"),
+    className: "px-4 py-2.5 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-50 text-navy font-semibold text-sm transition"
+  }, "\uD83D\uDDFA View Routes"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setPage("dpr"),
+    className: "px-4 py-2.5 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-50 text-navy font-semibold text-sm transition"
+  }, "\uD83D\uDCC4 Generate DPR")), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4"
+  }, /*#__PURE__*/React.createElement(StatCard, {
+    delay: 0,
+    icon: "\uD83D\uDCC1",
+    accent: "bg-blue-50 text-navy",
+    label: "Total Projects",
+    value: stats.total_projects,
+    sub: "3 added this quarter"
+  }), /*#__PURE__*/React.createElement(StatCard, {
+    delay: 80,
+    icon: "\uD83E\uDDED",
+    accent: "bg-orange-50 text-rorange",
+    label: "Routes Analysed",
+    value: stats.routes_analyzed,
+    sub: "AI alignments evaluated"
+  }), /*#__PURE__*/React.createElement(StatCard, {
+    delay: 160,
+    icon: "\uD83D\uDCB0",
+    accent: "bg-emerald-50 text-emerald-600",
+    label: "Cost Saved vs Manual",
+    value: cr(stats.cost_saved_cr),
+    sub: "cumulative FY 2025-26"
+  }), /*#__PURE__*/React.createElement(StatCard, {
+    delay: 240,
+    icon: "\uD83D\uDCC4",
+    accent: "bg-violet-50 text-violet-600",
+    label: "DPRs Generated",
+    value: stats.dprs_generated,
+    sub: "ready for submission"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-1 xl:grid-cols-3 gap-4 mt-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "xl:col-span-2 bg-white rounded-2xl p-5 shadow-sm ring-1 ring-slate-100 animate-fadein"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between mb-2"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-navy"
+  }, "Cumulative Cost Saved"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-slate-400"
+  }, "\u20B9 Crores \xB7 FY 2025-26")), /*#__PURE__*/React.createElement("span", {
+    className: "text-rorange font-bold"
+  }, cr(2840))), ResponsiveContainer && /*#__PURE__*/React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 240
+  }, /*#__PURE__*/React.createElement(AreaChart, {
+    data: trend,
+    margin: {
+      top: 10,
+      right: 10,
+      left: -12,
+      bottom: 0
+    }
+  }, /*#__PURE__*/React.createElement("defs", null, /*#__PURE__*/React.createElement("linearGradient", {
+    id: "g1",
+    x1: "0",
+    y1: "0",
+    x2: "0",
+    y2: "1"
+  }, /*#__PURE__*/React.createElement("stop", {
+    offset: "0%",
+    stopColor: "#FF6B00",
+    stopOpacity: 0.5
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "100%",
+    stopColor: "#FF6B00",
+    stopOpacity: 0
+  }))), /*#__PURE__*/React.createElement(CartesianGrid, {
+    strokeDasharray: "3 3",
+    stroke: "#eef2f7"
+  }), /*#__PURE__*/React.createElement(XAxis, {
+    dataKey: "m",
+    tick: {
+      fontSize: 12,
+      fill: "#94a3b8"
+    },
+    axisLine: false,
+    tickLine: false
+  }), /*#__PURE__*/React.createElement(YAxis, {
+    tick: {
+      fontSize: 12,
+      fill: "#94a3b8"
+    },
+    axisLine: false,
+    tickLine: false
+  }), /*#__PURE__*/React.createElement(Tooltip, {
+    formatter: v => cr(v),
+    contentStyle: {
+      borderRadius: 12,
+      border: "none",
+      boxShadow: "0 8px 30px rgba(0,0,0,.12)"
+    }
+  }), /*#__PURE__*/React.createElement(Area, {
+    type: "monotone",
+    dataKey: "saved",
+    stroke: "#FF6B00",
+    strokeWidth: 3,
+    fill: "url(#g1)"
+  })))), /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-2xl p-5 shadow-sm ring-1 ring-slate-100 animate-fadein"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-navy mb-1"
+  }, "Optimisation Priority Mix"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-slate-400 mb-2"
+  }, "across active projects"), ResponsiveContainer && /*#__PURE__*/React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 230
+  }, /*#__PURE__*/React.createElement(PieChart, null, /*#__PURE__*/React.createElement(Pie, {
+    data: mix,
+    dataKey: "value",
+    nameKey: "name",
+    innerRadius: 50,
+    outerRadius: 80,
+    paddingAngle: 3
+  }, mix.map((e, i) => /*#__PURE__*/React.createElement(Cell, {
+    key: i,
+    fill: e.fill
+  }))), /*#__PURE__*/React.createElement(Legend, {
+    iconType: "circle",
+    wrapperStyle: {
+      fontSize: 12
+    }
+  }), /*#__PURE__*/React.createElement(Tooltip, null))))), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-1 xl:grid-cols-3 gap-4 mt-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "xl:col-span-2 bg-white rounded-2xl shadow-sm ring-1 ring-slate-100 overflow-hidden animate-fadein"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between p-5 pb-3"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-navy"
+  }, "Recent Projects"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setPage("routes"),
+    className: "text-sm text-rorange font-semibold hover:underline"
+  }, "View all \u2192")), /*#__PURE__*/React.createElement("table", {
+    className: "w-full text-sm"
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", {
+    className: "text-left text-slate-400 border-y border-slate-100"
+  }, /*#__PURE__*/React.createElement("th", {
+    className: "px-5 py-2.5 font-semibold"
+  }, "Project"), /*#__PURE__*/React.createElement("th", {
+    className: "px-2 py-2.5 font-semibold"
+  }, "Zone"), /*#__PURE__*/React.createElement("th", {
+    className: "px-2 py-2.5 font-semibold"
+  }, "Length"), /*#__PURE__*/React.createElement("th", {
+    className: "px-2 py-2.5 font-semibold"
+  }, "Cost"), /*#__PURE__*/React.createElement("th", {
+    className: "px-2 py-2.5 font-semibold"
+  }, "Status"))), /*#__PURE__*/React.createElement("tbody", null, projects.map(p => /*#__PURE__*/React.createElement("tr", {
+    key: p.id,
+    onClick: () => openProject(p),
+    className: "border-b border-slate-50 hover:bg-orange-50/40 cursor-pointer transition"
+  }, /*#__PURE__*/React.createElement("td", {
+    className: "px-5 py-3 font-semibold text-navy"
+  }, p.name), /*#__PURE__*/React.createElement("td", {
+    className: "px-2 py-3 text-slate-500"
+  }, p.zone), /*#__PURE__*/React.createElement("td", {
+    className: "px-2 py-3 text-slate-600 tabular-nums"
+  }, p.length_km, " km"), /*#__PURE__*/React.createElement("td", {
+    className: "px-2 py-3 text-slate-600 tabular-nums"
+  }, cr(p.cost_cr)), /*#__PURE__*/React.createElement("td", {
+    className: "px-2 py-3"
+  }, /*#__PURE__*/React.createElement(StatusBadge, {
+    status: p.status
+  }))))))), /*#__PURE__*/React.createElement("div", {
+    className: "bg-gradient-to-br from-navy to-navy-600 rounded-2xl shadow-lg p-5 text-white animate-fadein"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2 mb-4"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-xl"
+  }, "\uD83E\uDD16"), /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold"
+  }, "AI Insights"), /*#__PURE__*/React.createElement("span", {
+    className: "ml-auto text-[10px] bg-rorange px-2 py-0.5 rounded-full font-bold"
+  }, "3 NEW")), /*#__PURE__*/React.createElement("div", {
+    className: "space-y-3"
+  }, AI_INSIGHTS.map((a, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    className: "bg-white/10 backdrop-blur rounded-xl p-3 hover:bg-white/15 transition animate-slidein",
+    style: {
+      animationDelay: "".concat(i * 100, "ms")
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2 font-semibold text-sm"
+  }, /*#__PURE__*/React.createElement("span", null, a.icon), a.title, /*#__PURE__*/React.createElement("span", {
+    className: "ml-auto text-[9px] px-1.5 py-0.5 rounded-full ".concat(a.type === "alert" ? "bg-red-400/30 text-red-100" : a.type === "tip" ? "bg-amber-400/30 text-amber-100" : "bg-emerald-400/30 text-emerald-100")
+  }, a.type.toUpperCase())), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-blue-100/80 mt-1.5 leading-relaxed"
+  }, a.text)))))));
+}
+
+/* ============================ New Project (3-step) ============================ */
+function MiniMapPicker(_ref11) {
+  let start = _ref11.start,
+    end = _ref11.end,
+    setStart = _ref11.setStart,
+    setEnd = _ref11.setEnd,
+    active = _ref11.active;
+  const ref = useRef(null);
+  const map = useRef(null);
+  const markers = useRef({});
+  useEffect(() => {
+    if (!ref.current || map.current) return;
+    map.current = L.map(ref.current, {
+      zoomControl: true
+    }).setView([21.2514, 81.6296], 9);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 18,
+      attribution: "© OpenStreetMap"
+    }).addTo(map.current);
+    map.current.on("click", e => {
+      const sel = activeRef.current;
+      if (sel === "start") setStart([e.latlng.lat, e.latlng.lng]);else setEnd([e.latlng.lat, e.latlng.lng]);
+    });
+    setTimeout(() => map.current.invalidateSize(), 200);
+  }, []);
+  const activeRef = useRef(active);
+  useEffect(() => {
+    activeRef.current = active;
+  }, [active]);
+  useEffect(() => {
+    if (!map.current) return;
+    const mk = (latlng, color, label) => L.marker(latlng, {
+      icon: L.divIcon({
+        className: "",
+        html: "<div style=\"background:".concat(color, ";color:#fff;width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:grid;place-items:center;box-shadow:0 3px 8px rgba(0,0,0,.3);border:2px solid #fff\"><span style=\"transform:rotate(45deg);font-size:12px;font-weight:700\">").concat(label, "</span></div>"),
+        iconSize: [30, 30],
+        iconAnchor: [15, 30]
+      })
+    });
+    if (markers.current.s) map.current.removeLayer(markers.current.s);
+    if (markers.current.e) map.current.removeLayer(markers.current.e);
+    if (markers.current.line) map.current.removeLayer(markers.current.line);
+    if (start) markers.current.s = mk(start, "#003087", "A").addTo(map.current);
+    if (end) markers.current.e = mk(end, "#FF6B00", "B").addTo(map.current);
+    if (start && end) {
+      markers.current.line = L.polyline([start, end], {
+        color: "#FF6B00",
+        weight: 4,
+        dashArray: "8 6"
+      }).addTo(map.current);
+      map.current.fitBounds([start, end], {
+        padding: [50, 50]
+      });
+    }
+  }, [start, end]);
+  return /*#__PURE__*/React.createElement("div", {
+    ref: ref,
+    className: "w-full h-[340px] rounded-xl overflow-hidden ring-1 ring-slate-200"
+  });
+}
+function NewProject(_ref12) {
+  let setPage = _ref12.setPage,
+    onGenerate = _ref12.onGenerate;
+  const _useState13 = useState(1),
+    _useState14 = _slicedToArray(_useState13, 2),
+    step = _useState14[0],
+    setStep = _useState14[1];
+  const _useState15 = useState(""),
+    _useState16 = _slicedToArray(_useState15, 2),
+    name = _useState16[0],
+    setName = _useState16[1];
+  const _useState17 = useState(ZONES[0]),
+    _useState18 = _slicedToArray(_useState17, 2),
+    zone = _useState18[0],
+    setZone = _useState18[1];
+  const _useState19 = useState(""),
+    _useState20 = _slicedToArray(_useState19, 2),
+    desc = _useState20[0],
+    setDesc = _useState20[1];
+  const _useState21 = useState(null),
+    _useState22 = _slicedToArray(_useState21, 2),
+    start = _useState22[0],
+    setStart = _useState22[1];
+  const _useState23 = useState(null),
+    _useState24 = _slicedToArray(_useState23, 2),
+    end = _useState24[0],
+    setEnd = _useState24[1];
+  const _useState25 = useState("start"),
+    _useState26 = _slicedToArray(_useState25, 2),
+    pickActive = _useState26[0],
+    setPickActive = _useState26[1];
+  const _useState27 = useState("Cost"),
+    _useState28 = _slicedToArray(_useState27, 2),
+    priority = _useState28[0],
+    setPriority = _useState28[1];
+  const steps = ["Project Info", "Route Points", "Preferences"];
+  const canNext = step === 1 ? name.trim().length > 2 : step === 2 ? start && end : true;
+  const submit = () => {
+    onGenerate({
+      name,
+      zone,
+      description: desc,
+      priority,
+      start_lat: start === null || start === void 0 ? void 0 : start[0],
+      start_lng: start === null || start === void 0 ? void 0 : start[1],
+      end_lat: end === null || end === void 0 ? void 0 : end[0],
+      end_lng: end === null || end === void 0 ? void 0 : end[1]
+    });
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "max-w-4xl mx-auto"
+  }, /*#__PURE__*/React.createElement(TopBar, {
+    title: "Create New Project",
+    subtitle: "Define a new railway route alignment in three steps"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-2xl p-6 shadow-sm ring-1 ring-slate-100 animate-fadein"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center mb-8"
+  }, steps.map((s, i) => {
+    const n = i + 1,
+      done = step > n,
+      cur = step === n;
+    return /*#__PURE__*/React.createElement(React.Fragment, {
+      key: s
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex flex-col items-center",
+      style: {
+        minWidth: 90
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "w-10 h-10 rounded-full grid place-items-center font-bold transition-all duration-300\n                    ".concat(done ? "bg-emerald-500 text-white" : cur ? "bg-navy text-white scale-110 shadow-lg shadow-navy/30" : "bg-slate-100 text-slate-400")
+    }, done ? "✓" : n), /*#__PURE__*/React.createElement("span", {
+      className: "text-xs mt-2 font-semibold ".concat(cur ? "text-navy" : "text-slate-400")
+    }, s)), i < steps.length - 1 && /*#__PURE__*/React.createElement("div", {
+      className: "flex-1 h-1 rounded-full mx-1 mb-6 transition-all duration-500 ".concat(step > n ? "bg-emerald-500" : "bg-slate-100")
+    }));
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "min-h-[360px]"
+  }, step === 1 && /*#__PURE__*/React.createElement("div", {
+    className: "space-y-5 animate-fadein"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    className: "text-sm font-semibold text-slate-700"
+  }, "Project Name *"), /*#__PURE__*/React.createElement("input", {
+    value: name,
+    onChange: e => setName(e.target.value),
+    placeholder: "e.g. Raipur\u2013Bhilai Freight Corridor",
+    className: "mt-1 w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-navy focus:ring-2 focus:ring-navy/20 outline-none transition"
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    className: "text-sm font-semibold text-slate-700"
+  }, "Railway Zone"), /*#__PURE__*/React.createElement("select", {
+    value: zone,
+    onChange: e => setZone(e.target.value),
+    className: "mt-1 w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-navy focus:ring-2 focus:ring-navy/20 outline-none transition bg-white"
+  }, ZONES.map(z => /*#__PURE__*/React.createElement("option", {
+    key: z
+  }, z)))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    className: "text-sm font-semibold text-slate-700"
+  }, "Description"), /*#__PURE__*/React.createElement("textarea", {
+    value: desc,
+    onChange: e => setDesc(e.target.value),
+    rows: 4,
+    placeholder: "Purpose, scope, traffic projections...",
+    className: "mt-1 w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-navy focus:ring-2 focus:ring-navy/20 outline-none transition resize-none"
+  }))), step === 2 && /*#__PURE__*/React.createElement("div", {
+    className: "animate-fadein"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-3 mb-3"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setPickActive("start"),
+    className: "flex-1 px-4 py-3 rounded-xl text-sm font-semibold ring-1 transition ".concat(pickActive === "start" ? "bg-navy text-white ring-navy" : "bg-white text-navy ring-slate-200 hover:bg-slate-50")
+  }, "\uD83D\uDCCD Start Point (A) ", start ? "\xB7 ".concat(start[0].toFixed(3), ", ").concat(start[1].toFixed(3)) : "· click map"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setPickActive("end"),
+    className: "flex-1 px-4 py-3 rounded-xl text-sm font-semibold ring-1 transition ".concat(pickActive === "end" ? "bg-rorange text-white ring-rorange" : "bg-white text-rorange ring-slate-200 hover:bg-slate-50")
+  }, "\uD83C\uDFC1 End Point (B) ", end ? "\xB7 ".concat(end[0].toFixed(3), ", ").concat(end[1].toFixed(3)) : "· click map")), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-slate-400 mb-3"
+  }, "Select ", /*#__PURE__*/React.createElement("b", null, pickActive === "start" ? "Start (A)" : "End (B)"), ", then click anywhere on the map to drop the point."), /*#__PURE__*/React.createElement(MiniMapPicker, {
+    start: start,
+    end: end,
+    setStart: setStart,
+    setEnd: setEnd,
+    active: pickActive
+  })), step === 3 && /*#__PURE__*/React.createElement("div", {
+    className: "animate-fadein"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "text-sm font-semibold text-slate-700"
+  }, "Optimisation Priority"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-slate-400 mb-4"
+  }, "What should the AI optimise the alignment for?"), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-3 gap-4"
+  }, [{
+    id: "Cost",
+    icon: "💰",
+    t: "Lowest Cost",
+    d: "Minimise earthwork, bridges & land acquisition.",
+    c: "navy"
+  }, {
+    id: "Time",
+    icon: "⚡",
+    t: "Fastest Build",
+    d: "Shortest, most constructible alignment.",
+    c: "rorange"
+  }, {
+    id: "Environment",
+    icon: "🌳",
+    t: "Eco-Friendly",
+    d: "Avoid forests, rivers & sensitive zones.",
+    c: "emerald"
+  }].map(o => /*#__PURE__*/React.createElement("button", {
+    key: o.id,
+    onClick: () => setPriority(o.id),
+    className: "text-left p-5 rounded-2xl ring-2 transition active:scale-95 ".concat(priority === o.id ? "ring-rorange bg-orange-50 shadow-lg" : "ring-slate-200 bg-white hover:ring-slate-300")
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-3xl mb-2"
+  }, o.icon), /*#__PURE__*/React.createElement("div", {
+    className: "font-bold text-navy"
+  }, o.t), /*#__PURE__*/React.createElement("div", {
+    className: "text-xs text-slate-500 mt-1"
+  }, o.d), priority === o.id && /*#__PURE__*/React.createElement("div", {
+    className: "mt-3 text-xs font-bold text-rorange"
+  }, "\u2713 Selected")))), /*#__PURE__*/React.createElement("div", {
+    className: "mt-6 bg-slate-50 rounded-xl p-4 text-sm"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "font-bold text-navy mb-2"
+  }, "Review"), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-2 text-slate-600"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-400"
+  }, "Name:"), " ", name || "—"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-400"
+  }, "Zone:"), " ", zone), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-400"
+  }, "Start:"), " ", start ? "".concat(start[0].toFixed(3), ", ").concat(start[1].toFixed(3)) : "—"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-400"
+  }, "End:"), " ", end ? "".concat(end[0].toFixed(3), ", ").concat(end[1].toFixed(3)) : "—"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-400"
+  }, "Priority:"), " ", priority))))), /*#__PURE__*/React.createElement("div", {
+    className: "flex justify-between mt-8 pt-5 border-t border-slate-100"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => step === 1 ? setPage("dashboard") : setStep(step - 1),
+    className: "px-5 py-2.5 rounded-xl bg-white ring-1 ring-slate-200 text-slate-600 font-semibold hover:bg-slate-50 transition"
+  }, step === 1 ? "Cancel" : "← Back"), step < 3 ? /*#__PURE__*/React.createElement("button", {
+    disabled: !canNext,
+    onClick: () => setStep(step + 1),
+    className: "px-6 py-2.5 rounded-xl bg-navy hover:bg-navy-600 text-white font-semibold transition active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+  }, "Next \u2192") : /*#__PURE__*/React.createElement("button", {
+    onClick: submit,
+    className: "px-6 py-2.5 rounded-xl bg-rorange hover:bg-rorange-600 text-white font-semibold shadow-lg shadow-rorange/20 transition active:scale-95"
+  }, "\uD83D\uDE80 Generate Route"))));
+}
+
+/* ============================ Route Generation Loading ============================ */
+function RouteGenerating(_ref13) {
+  let project = _ref13.project,
+    onDone = _ref13.onDone;
+  const _useState29 = useState(0),
+    _useState30 = _slicedToArray(_useState29, 2),
+    i = _useState30[0],
+    setI = _useState30[1];
+  useEffect(() => {
+    const t = setInterval(() => setI(v => v + 1), 900);
+    const done = setTimeout(onDone, LOADING_MSGS.length * 900 + 400);
+    return () => {
+      clearInterval(t);
+      clearTimeout(done);
+    };
+  }, []);
+  const pct = Math.min(100, Math.round((i + 1) / LOADING_MSGS.length * 100));
+  return /*#__PURE__*/React.createElement("div", {
+    className: "grid place-items-center h-[78vh] animate-fadein"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-center max-w-md w-full"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-rorange text-xs font-bold tracking-widest mb-2"
+  }, "RAILPLAN AI ENGINE"), /*#__PURE__*/React.createElement("h2", {
+    className: "text-2xl font-extrabold text-navy mb-1"
+  }, "Generating optimal alignment"), /*#__PURE__*/React.createElement("p", {
+    className: "text-slate-500 mb-8"
+  }, project === null || project === void 0 ? void 0 : project.name), /*#__PURE__*/React.createElement(Spinner, {
+    label: LOADING_MSGS[Math.min(i, LOADING_MSGS.length - 1)]
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "mt-6"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "track"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "train",
+    style: {
+      left: "calc(".concat(pct, "% - 28px)"),
+      transition: "left .6s ease"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-end gap-0.5"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "w-6 h-4 rounded-t bg-rorange"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "w-4 h-3 rounded bg-navy"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "w-4 h-3 rounded bg-navy"
+  })))), /*#__PURE__*/React.createElement("div", {
+    className: "text-right text-xs font-bold text-navy mt-2 tabular-nums"
+  }, pct, "%"))));
+}
+
+/* ============================ Phase 2: AI Working Overlay ============================ */
+function AIWorkingOverlay(_ref14) {
+  let project = _ref14.project,
+    onDone = _ref14.onDone;
+  const _useState31 = useState([]),
+    _useState32 = _slicedToArray(_useState31, 2),
+    done = _useState32[0],
+    setDone = _useState32[1]; // indices completed
+  const _useState33 = useState(0),
+    _useState34 = _slicedToArray(_useState33, 2),
+    active = _useState34[0],
+    setActive = _useState34[1]; // current running step
+  const total = AI_STEPS.length;
+  useEffect(() => {
+    let i = 0;
+    let cancelled = false;
+    const run = () => {
+      if (cancelled) return;
+      if (i >= total) {
+        setTimeout(onDone, 650);
+        return;
+      }
+      setActive(i);
+      setTimeout(() => {
+        if (cancelled) return;
+        setDone(prev => [...prev, i]);
+        i += 1;
+        run();
+      }, AI_STEPS[i].dur);
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const pct = Math.round(done.length / total * 100);
+  return /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 z-[2000] bg-gradient-to-br from-navy-900 via-navy to-[#06163a] flex items-center justify-center p-6 animate-fadein overflow-hidden"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "absolute inset-0 opacity-[0.07]",
+    style: {
+      backgroundImage: "linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px)",
+      backgroundSize: "44px 44px"
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "absolute top-1/4 left-1/4 w-72 h-72 rounded-full bg-rorange/20 blur-3xl animate-pulseGlow"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "absolute bottom-1/4 right-1/4 w-80 h-80 rounded-full bg-blue-400/20 blur-3xl animate-pulseGlow",
+    style: {
+      animationDelay: "1s"
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "relative z-10 w-full max-w-xl"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-center mb-8"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "inline-flex items-center gap-2 text-rorange text-xs font-bold tracking-[0.2em] mb-3 bg-white/5 px-4 py-1.5 rounded-full ring-1 ring-white/10"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "w-2 h-2 rounded-full bg-rorange animate-pulse"
+  }), "RAILPLAN AI ENGINE"), /*#__PURE__*/React.createElement("h2", {
+    className: "text-3xl font-black text-white"
+  }, "Generating Optimal Routes"), /*#__PURE__*/React.createElement("p", {
+    className: "text-blue-200/70 mt-1"
+  }, (project === null || project === void 0 ? void 0 : project.name) || "Raipur → Durg Corridor")), /*#__PURE__*/React.createElement("div", {
+    className: "bg-white/5 backdrop-blur-xl rounded-2xl ring-1 ring-white/10 p-5 space-y-1"
+  }, AI_STEPS.map((s, i) => {
+    const isDone = done.includes(i);
+    const isActive = active === i && !isDone;
+    const isPending = i > active;
+    return /*#__PURE__*/React.createElement("div", {
+      key: i,
+      className: "flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-300\n                  ".concat(isActive ? "bg-white/10 scale-[1.02]" : "", " ").concat(isPending ? "opacity-35" : "opacity-100")
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "w-8 h-8 rounded-full grid place-items-center shrink-0 transition-all duration-300\n                  ".concat(isDone ? "bg-emerald-500 text-white" : isActive ? "bg-rorange text-white" : "bg-white/10 text-white/40")
+    }, isDone ? "✓" : isActive ? /*#__PURE__*/React.createElement("span", {
+      className: "w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"
+    }) : /*#__PURE__*/React.createElement("span", {
+      className: "text-sm"
+    }, s.icon)), /*#__PURE__*/React.createElement("span", {
+      className: "text-sm font-medium flex-1 ".concat(isDone ? "text-emerald-200" : isActive ? "text-white" : "text-white/50")
+    }, s.label), isDone && /*#__PURE__*/React.createElement("span", {
+      className: "text-emerald-300 text-xs font-bold animate-fadein"
+    }, "done"), isActive && /*#__PURE__*/React.createElement("span", {
+      className: "text-rorange text-xs font-bold"
+    }, "running\u2026"));
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "mt-6"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "track"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "train",
+    style: {
+      left: "calc(".concat(pct, "% - 28px)"),
+      transition: "left .5s ease"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-end gap-0.5"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "w-6 h-4 rounded-t bg-rorange"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "w-4 h-3 rounded bg-amber-300"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "w-4 h-3 rounded bg-amber-300"
+  })))), /*#__PURE__*/React.createElement("div", {
+    className: "flex justify-between mt-2 text-xs font-bold"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-blue-200/60"
+  }, done.length, " / ", total, " stages complete"), /*#__PURE__*/React.createElement("span", {
+    className: "text-white tabular-nums"
+  }, pct, "%")))));
+}
+
+/* ============================ Phase 2: Route Generation Results ============================ */
+function RouteResults(_ref15) {
+  let project = _ref15.project,
+    onBack = _ref15.onBack;
+  const ref = useRef(null);
+  const map = useRef(null);
+  const routeLayers = useRef({});
+  const _useState35 = useState([]),
+    _useState36 = _slicedToArray(_useState35, 2),
+    routes = _useState36[0],
+    setRoutes = _useState36[1];
+  const _useState37 = useState("B"),
+    _useState38 = _slicedToArray(_useState37, 2),
+    selected = _useState38[0],
+    setSelected = _useState38[1];
+  const _useState39 = useState(null),
+    _useState40 = _slicedToArray(_useState39, 2),
+    hover = _useState40[0],
+    setHover = _useState40[1];
+  const _useState41 = useState(0),
+    _useState42 = _slicedToArray(_useState41, 2),
+    revealStep = _useState42[0],
+    setRevealStep = _useState42[1]; // for smooth reveal of routes
+
+  // best/worst per metric (lower is better for all here)
+  const best = useMemo(() => {
+    if (!routes.length) return {};
+    const keys = ["distance_km", "cost_cr", "forest_sqkm", "land_ha"];
+    const o = {};
+    keys.forEach(k => {
+      const vals = routes.map(r => r[k]);
+      o[k] = {
+        min: Math.min(...vals),
+        max: Math.max(...vals)
+      };
+    });
+    // gradient: higher denominator = gentler = better
+    const g = routes.map(r => r.grad_val);
+    o.grad_val = {
+      min: Math.min(...g),
+      max: Math.max(...g)
+    };
+    return o;
+  }, [routes]);
+  useEffect(() => {
+    // Use the complete local route dataset (has all UI fields & matches the spec).
+    setRoutes(ROUTE_DATA);
+  }, []);
+
+  // init map
+  useEffect(() => {
+    if (!ref.current || map.current || !routes.length) return;
+    map.current = L.map(ref.current, {
+      zoomControl: false,
+      attributionControl: false
+    }).setView([21.42, 81.55], 10);
+    L.control.zoom({
+      position: "topright"
+    }).addTo(map.current);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 18
+    }).addTo(map.current);
+    // endpoint pins
+    const pin = (ll, col, lab) => L.marker(ll, {
+      icon: L.divIcon({
+        className: "",
+        html: "<div style=\"background:".concat(col, ";color:#fff;width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:grid;place-items:center;border:2px solid #fff;box-shadow:0 3px 8px rgba(0,0,0,.4)\"><span style=\"transform:rotate(45deg);font-weight:700;font-size:12px\">").concat(lab, "</span></div>"),
+        iconSize: [30, 30],
+        iconAnchor: [15, 30]
+      })
+    }).addTo(map.current);
+    pin([21.2514, 81.6296], "#003087", "A");
+    pin([21.1900, 81.2833], "#FF6B00", "B");
+    setTimeout(() => map.current.invalidateSize(), 200);
+    // staggered reveal
+    routes.forEach((_, i) => setTimeout(() => setRevealStep(s => Math.max(s, i + 1)), 350 * (i + 1)));
+  }, [routes]);
+
+  // draw / restyle routes
+  useEffect(() => {
+    if (!map.current || !routes.length) return;
+    routes.forEach((r, i) => {
+      if (i + 1 > revealStep) return;
+      const isSel = selected === r.id;
+      if (routeLayers.current[r.id]) map.current.removeLayer(routeLayers.current[r.id]);
+      const pl = L.polyline(r.waypoints, {
+        color: r.color,
+        weight: isSel ? 7 : 4,
+        opacity: isSel ? 1 : 0.55,
+        dashArray: isSel ? null : "2 8",
+        lineCap: "round"
+      }).addTo(map.current);
+      pl.bindTooltip("Route ".concat(r.id, " \xB7 ").concat(r.name, " \xB7 ").concat(r.distance_km, " km"), {
+        sticky: true
+      });
+      pl.on("click", () => setSelected(r.id));
+      routeLayers.current[r.id] = pl;
+      // waypoint dots
+      r.waypoints.forEach((wp, wi) => {
+        if (wi === 0 || wi === r.waypoints.length - 1) return;
+        const c = L.circleMarker(wp, {
+          radius: isSel ? 6 : 4,
+          color: "#fff",
+          weight: 2,
+          fillColor: r.color,
+          fillOpacity: 1
+        }).addTo(map.current);
+        c.bindTooltip(r.wpNames && r.wpNames[wi] ? r.wpNames[wi] : "Waypoint " + wi);
+        routeLayers.current[r.id + "_wp" + wi] = c;
+      });
+    });
+    const sel = routes.find(r => r.id === selected);
+    if (sel && revealStep >= routes.length) map.current.fitBounds(sel.waypoints, {
+      padding: [60, 60]
+    });
+  }, [routes, selected, revealStep]);
+  const AreaChart = RC.AreaChart,
+    Area = RC.Area,
+    LineChart = RC.LineChart,
+    Line = RC.Line,
+    ResponsiveContainer = RC.ResponsiveContainer,
+    XAxis = RC.XAxis,
+    YAxis = RC.YAxis,
+    Tooltip = RC.Tooltip,
+    CartesianGrid = RC.CartesianGrid,
+    Legend = RC.Legend,
+    ReferenceArea = RC.ReferenceArea;
+  const cell = function (val, metric) {
+    let lowerBetter = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : true;
+    const b = best[metric];
+    if (!b) return "";
+    const isBest = lowerBetter ? val === b.min : val === b.max;
+    const isWorst = lowerBetter ? val === b.max : val === b.min;
+    if (isBest) return "bg-emerald-50 text-emerald-700 font-bold";
+    if (isWorst) return "bg-red-50 text-red-600 font-semibold";
+    return "text-slate-600";
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "animate-fadein"
+  }, /*#__PURE__*/React.createElement(TopBar, {
+    title: "AI Route Generation",
+    subtitle: "".concat((project === null || project === void 0 ? void 0 : project.name) || "Raipur → Durg Corridor", " \xB7 3 optimal alignments generated")
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: onBack,
+    className: "px-4 py-2.5 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-50 text-navy font-semibold text-sm transition"
+  }, "\u2190 Back"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => alert("Demo: alignment exported & DPR queued."),
+    className: "px-4 py-2.5 rounded-xl bg-rorange hover:bg-rorange-600 text-white font-semibold text-sm shadow-lg shadow-rorange/20 transition active:scale-95"
+  }, "\u2713 Approve Route ", selected)), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-1 xl:grid-cols-4 gap-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "xl:col-span-3 bg-white rounded-2xl shadow-sm ring-1 ring-slate-100 overflow-hidden"
+  }, /*#__PURE__*/React.createElement("div", {
+    ref: ref,
+    className: "w-full",
+    style: {
+      height: 440
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-wrap items-center gap-x-5 gap-y-1 px-4 py-2.5 bg-navy text-white text-xs"
+  }, routes.map(r => /*#__PURE__*/React.createElement("button", {
+    key: r.id,
+    onClick: () => setSelected(r.id),
+    className: "flex items-center gap-1.5 font-medium transition ".concat(selected === r.id ? "opacity-100" : "opacity-60 hover:opacity-90")
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "w-4 h-1.5 rounded",
+    style: {
+      background: r.color
+    }
+  }), "Route ", r.id, r.recommended ? " ★" : "")), /*#__PURE__*/React.createElement("span", {
+    className: "ml-auto flex items-center gap-1.5"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "w-2 h-2 rounded-full bg-emerald-400 animate-pulse"
+  }), "3 routes rendered"))), /*#__PURE__*/React.createElement("div", {
+    className: "space-y-3"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-navy text-sm flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDD0E"), "AI Analysis"), MINI_ANALYSIS.map((m, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    className: "bg-white rounded-2xl shadow-sm ring-1 ring-slate-100 p-4 hover:shadow-md transition animate-slidein",
+    style: {
+      animationDelay: "".concat(i * 90, "ms")
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2 mb-1"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "w-8 h-8 rounded-lg grid place-items-center ".concat(m.accent)
+  }, m.icon), /*#__PURE__*/React.createElement("span", {
+    className: "font-bold text-navy text-sm"
+  }, m.title)), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-slate-500 leading-relaxed"
+  }, m.text))))), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-1 md:grid-cols-3 gap-4 mt-4"
+  }, routes.map((r, i) => {
+    const isSel = selected === r.id;
+    return /*#__PURE__*/React.createElement("div", {
+      key: r.id,
+      className: "relative bg-white rounded-2xl overflow-hidden shadow-sm transition-all duration-300 animate-fadein\n                ".concat(r.recommended ? "ring-2 ring-emerald-400 shadow-lg shadow-emerald-100" : isSel ? "ring-2 ring-navy" : "ring-1 ring-slate-100"),
+      style: {
+        animationDelay: "".concat(i * 80, "ms"),
+        boxShadow: r.recommended ? "0 0 0 1px #4CAF50, 0 10px 30px rgba(76,175,80,.18)" : undefined
+      }
+    }, r.recommended && /*#__PURE__*/React.createElement("div", {
+      className: "absolute top-3 right-3 z-10 flex flex-col items-end gap-1"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow animate-pulseGlow"
+    }, "\uD83E\uDD16 AI Recommended"), /*#__PURE__*/React.createElement("span", {
+      className: "bg-amber-400 text-navy text-[10px] font-bold px-2 py-0.5 rounded-full"
+    }, "BEST VALUE")), /*#__PURE__*/React.createElement("div", {
+      className: "h-2",
+      style: {
+        background: r.color
+      }
+    }), /*#__PURE__*/React.createElement("div", {
+      className: "p-5"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "text-xs font-bold tracking-wide",
+      style: {
+        color: r.color
+      }
+    }, "ROUTE ", r.id), /*#__PURE__*/React.createElement("h3", {
+      className: "text-lg font-extrabold text-navy"
+    }, r.name), /*#__PURE__*/React.createElement("div", {
+      className: "text-3xl font-black text-navy mt-3 tabular-nums"
+    }, cr(r.cost_cr)), /*#__PURE__*/React.createElement("div", {
+      className: "text-xs text-slate-400 mb-4"
+    }, "estimated construction cost"), /*#__PURE__*/React.createElement("div", {
+      className: "space-y-2 text-sm border-t border-slate-100 pt-3"
+    }, [["Distance", r.distance_km + " km"], ["Bridges", "".concat(r.bridges_major, " major \xB7 ").concat(r.bridges_minor, " minor")], ["Tunnels", r.tunnels], ["Forest impact", r.forest_sqkm + " sq km"], ["Land acquisition", inFormat(r.land_ha) + " ha"]].map(_ref16 => {
+      let _ref17 = _slicedToArray(_ref16, 2),
+        k = _ref17[0],
+        v = _ref17[1];
+      return /*#__PURE__*/React.createElement("div", {
+        key: k,
+        className: "flex justify-between"
+      }, /*#__PURE__*/React.createElement("span", {
+        className: "text-slate-400"
+      }, k), /*#__PURE__*/React.createElement("span", {
+        className: "text-slate-700 font-semibold"
+      }, v));
+    }), /*#__PURE__*/React.createElement("div", {
+      className: "flex justify-between items-center"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "text-slate-400"
+    }, "Max gradient"), /*#__PURE__*/React.createElement("span", {
+      className: "font-bold px-2 py-0.5 rounded-full text-xs ".concat(r.grad_status === "warn" ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-700")
+    }, r.gradient, " ", r.grad_status === "warn" ? "\u26A0\uFE0F ".concat(r.grad_label) : "\u2705 ".concat(r.grad_label)))), /*#__PURE__*/React.createElement("button", {
+      onClick: () => setSelected(r.id),
+      className: "w-full mt-4 py-2.5 rounded-xl font-bold text-sm transition active:scale-95\n                    ".concat(isSel ? "text-white" : "bg-slate-100 text-navy hover:bg-slate-200"),
+      style: isSel ? {
+        background: r.color
+      } : undefined
+    }, isSel ? "✓ Selected" : "Select Route")));
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-2xl shadow-sm ring-1 ring-slate-100 mt-4 overflow-hidden animate-fadein"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "p-5 pb-3"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-navy"
+  }, "Side-by-Side Comparison"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-slate-400"
+  }, "Green = best \xB7 Red = worst for each parameter")), /*#__PURE__*/React.createElement("div", {
+    className: "overflow-x-auto"
+  }, /*#__PURE__*/React.createElement("table", {
+    className: "w-full text-sm"
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", {
+    className: "text-left border-y border-slate-100"
+  }, /*#__PURE__*/React.createElement("th", {
+    className: "px-5 py-3 font-semibold text-slate-400"
+  }, "Parameter"), routes.map(r => /*#__PURE__*/React.createElement("th", {
+    key: r.id,
+    className: "px-4 py-3 font-bold",
+    style: {
+      color: r.color
+    }
+  }, "Route ", r.id, " ", r.recommended && /*#__PURE__*/React.createElement("span", {
+    className: "text-emerald-500"
+  }, "\u2605"), /*#__PURE__*/React.createElement("div", {
+    className: "text-[10px] font-medium text-slate-400"
+  }, r.name))))), /*#__PURE__*/React.createElement("tbody", null, [["Distance", "distance_km", v => v + " km", true], ["Cost (₹ Cr)", "cost_cr", v => inFormat(v), true], ["Major bridges", "bridges_major", v => v, true], ["Minor bridges", "bridges_minor", v => v, true], ["Forest (sq km)", "forest_sqkm", v => v, true], ["Land (hectares)", "land_ha", v => inFormat(v), true], ["Max gradient", "grad_val", null, false]].map(_ref18 => {
+    let _ref19 = _slicedToArray(_ref18, 4),
+      label = _ref19[0],
+      key = _ref19[1],
+      fmt = _ref19[2],
+      lower = _ref19[3];
+    return /*#__PURE__*/React.createElement("tr", {
+      key: key,
+      className: "border-b border-slate-50"
+    }, /*#__PURE__*/React.createElement("td", {
+      className: "px-5 py-2.5 font-medium text-slate-600"
+    }, label), routes.map(r => /*#__PURE__*/React.createElement("td", {
+      key: r.id,
+      className: "px-4 py-2.5 rounded ".concat(key === "grad_val" ? cell(r.grad_val, "grad_val", false) : cell(r[key], key, lower))
+    }, key === "grad_val" ? r.gradient : fmt(r[key]))));
+  }))))), /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-2xl shadow-sm ring-1 ring-slate-100 mt-4 p-5 animate-fadein"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between mb-1"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-navy"
+  }, "Elevation Profile"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-slate-400"
+  }, "Distance (km) vs Elevation (m) \xB7 steep section on Route A highlighted")), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-3 text-xs"
+  }, routes.map(r => /*#__PURE__*/React.createElement("span", {
+    key: r.id,
+    className: "flex items-center gap-1.5"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "w-3 h-1.5 rounded",
+    style: {
+      background: r.color
+    }
+  }), "Route ", r.id)))), ResponsiveContainer && /*#__PURE__*/React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 280
+  }, /*#__PURE__*/React.createElement(LineChart, {
+    data: ELEVATION,
+    margin: {
+      top: 10,
+      right: 16,
+      left: -8,
+      bottom: 4
+    }
+  }, /*#__PURE__*/React.createElement("defs", null, /*#__PURE__*/React.createElement("linearGradient", {
+    id: "steepZone",
+    x1: "0",
+    y1: "0",
+    x2: "0",
+    y2: "1"
+  }, /*#__PURE__*/React.createElement("stop", {
+    offset: "0%",
+    stopColor: "#ef4444",
+    stopOpacity: 0.18
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "100%",
+    stopColor: "#ef4444",
+    stopOpacity: 0.02
+  }))), /*#__PURE__*/React.createElement(CartesianGrid, {
+    strokeDasharray: "3 3",
+    stroke: "#eef2f7"
+  }), /*#__PURE__*/React.createElement(XAxis, {
+    dataKey: "d",
+    tick: {
+      fontSize: 11,
+      fill: "#94a3b8"
+    },
+    axisLine: false,
+    tickLine: false,
+    label: {
+      value: "Distance (km)",
+      position: "insideBottom",
+      offset: -2,
+      fontSize: 11,
+      fill: "#94a3b8"
+    }
+  }), /*#__PURE__*/React.createElement(YAxis, {
+    tick: {
+      fontSize: 11,
+      fill: "#94a3b8"
+    },
+    axisLine: false,
+    tickLine: false,
+    domain: [240, 400],
+    label: {
+      value: "Elev (m)",
+      angle: -90,
+      position: "insideLeft",
+      fontSize: 11,
+      fill: "#94a3b8"
+    }
+  }), /*#__PURE__*/React.createElement(Tooltip, {
+    formatter: (v, n) => [v + " m", n === "a" ? "Route A" : n === "b" ? "Route B" : "Route C"],
+    labelFormatter: l => l + " km",
+    contentStyle: {
+      borderRadius: 12,
+      border: "none",
+      boxShadow: "0 8px 30px rgba(0,0,0,.12)"
+    }
+  }), ReferenceArea && /*#__PURE__*/React.createElement(ReferenceArea, {
+    x1: 30,
+    x2: 42,
+    fill: "url(#steepZone)",
+    stroke: "#ef4444",
+    strokeOpacity: 0.3,
+    label: {
+      value: "⚠ steep",
+      fontSize: 10,
+      fill: "#ef4444",
+      position: "insideTop"
+    }
+  }), /*#__PURE__*/React.createElement(Line, {
+    type: "monotone",
+    dataKey: "a",
+    stroke: "#2196F3",
+    strokeWidth: 2,
+    dot: false,
+    connectNulls: true,
+    name: "a"
+  }), /*#__PURE__*/React.createElement(Line, {
+    type: "monotone",
+    dataKey: "b",
+    stroke: "#4CAF50",
+    strokeWidth: 3,
+    dot: false,
+    connectNulls: true,
+    name: "b"
+  }), /*#__PURE__*/React.createElement(Line, {
+    type: "monotone",
+    dataKey: "c",
+    stroke: "#FF9800",
+    strokeWidth: 2,
+    dot: false,
+    connectNulls: true,
+    name: "c"
+  }))), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-slate-400 mt-2"
+  }, "\uD83D\uDCC9 Route B (green) has the smoothest profile \u2014 fewer cut-and-fill operations and a constructible 1:120 ruling gradient.")));
+}
+
+/* ============================ GIS Map Viewer ============================ */
+const LAYERS = [{
+  id: "satellite",
+  label: "Satellite View",
+  icon: "🛰",
+  color: "#475569"
+}, {
+  id: "elevation",
+  label: "Elevation Heatmap",
+  icon: "⛰",
+  color: "#f59e0b"
+}, {
+  id: "rivers",
+  label: "Rivers & Water Bodies",
+  icon: "🌊",
+  color: "#0ea5e9"
+}, {
+  id: "forest",
+  label: "Forest Areas",
+  icon: "🌲",
+  color: "#16a34a"
+}, {
+  id: "railways",
+  label: "Existing Railways",
+  icon: "🚆",
+  color: "#1e293b"
+}, {
+  id: "villages",
+  label: "Villages",
+  icon: "🏘",
+  color: "#9333ea"
+}];
+
+// mock geo features near Raipur
+const GEO = {
+  rivers: [[[21.36, 81.45], [21.30, 81.55], [21.22, 81.62], [21.12, 81.70], [21.02, 81.74]], [[21.40, 81.80], [21.30, 81.78], [21.20, 81.74], [21.10, 81.66]]],
+  forest: [[[21.33, 81.38], [21.36, 81.50], [21.28, 81.55], [21.22, 81.46], [21.26, 81.36]], [[21.05, 81.50], [21.10, 81.60], [21.02, 81.66], [20.96, 81.56]]],
+  railways: [[[21.2514, 81.6296], [21.23, 81.55], [21.21, 81.45], [21.19, 81.33], [21.1904, 81.2849]], [[21.2514, 81.6296], [21.30, 81.70], [21.38, 81.80]]],
+  villages: [{
+    n: "Mandir Hasaud",
+    p: [21.18, 81.72]
+  }, {
+    n: "Tilda",
+    p: [21.43, 81.83]
+  }, {
+    n: "Kumhari",
+    p: [21.27, 81.52]
+  }, {
+    n: "Bhilai-3",
+    p: [21.20, 81.43]
+  }, {
+    n: "Patan",
+    p: [21.05, 81.55]
+  }, {
+    n: "Arang",
+    p: [21.20, 81.97]
+  }],
+  elevation: [{
+    c: [21.33, 81.40],
+    r: 9000,
+    col: "#dc2626"
+  }, {
+    c: [21.28, 81.52],
+    r: 7000,
+    col: "#f97316"
+  }, {
+    c: [21.20, 81.62],
+    r: 6000,
+    col: "#facc15"
+  }, {
+    c: [21.12, 81.70],
+    r: 8000,
+    col: "#84cc16"
+  }, {
+    c: [21.05, 81.52],
+    r: 7500,
+    col: "#fb923c"
+  }]
+};
+function MapViewer(_ref20) {
+  let focusProject = _ref20.focusProject;
+  const ref = useRef(null);
+  const map = useRef(null);
+  const base = useRef({});
+  const overlays = useRef({});
+  const _useState43 = useState({
+      satellite: false,
+      elevation: true,
+      rivers: true,
+      forest: true,
+      railways: true,
+      villages: true
+    }),
+    _useState44 = _slicedToArray(_useState43, 2),
+    active = _useState44[0],
+    setActive = _useState44[1];
+  const _useState45 = useState([21.2514, 81.6296]),
+    _useState46 = _slicedToArray(_useState45, 2),
+    coords = _useState46[0],
+    setCoords = _useState46[1];
+  const _useState47 = useState(10),
+    _useState48 = _slicedToArray(_useState47, 2),
+    zoom = _useState48[0],
+    setZoom = _useState48[1];
+  const _useState49 = useState("—"),
+    _useState50 = _slicedToArray(_useState49, 2),
+    scale = _useState50[0],
+    setScale = _useState50[1];
+  useEffect(() => {
+    if (!ref.current || map.current) return;
+    const center = focusProject !== null && focusProject !== void 0 && focusProject.start_lat ? [focusProject.start_lat, focusProject.start_lng] : [21.2514, 81.6296];
+    map.current = L.map(ref.current, {
+      zoomControl: false,
+      attributionControl: false
+    }).setView(center, 10);
+    L.control.zoom({
+      position: "topright"
+    }).addTo(map.current);
+    base.current.street = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 18
+    });
+    base.current.sat = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+      maxZoom: 18
+    });
+    base.current.street.addTo(map.current);
+    map.current.on("mousemove", e => setCoords([e.latlng.lat, e.latlng.lng]));
+    map.current.on("zoomend moveend", () => {
+      const z = map.current.getZoom();
+      setZoom(z);
+      const metersPerPx = 156543.03392 * Math.cos(center[0] * Math.PI / 180) / Math.pow(2, z);
+      const sc = metersPerPx * 100;
+      setScale(sc > 1000 ? (sc / 1000).toFixed(1) + " km" : Math.round(sc) + " m");
+    });
+    map.current.fire("zoomend");
+    setTimeout(() => map.current.invalidateSize(), 200);
+    buildOverlays();
+    drawProjectRoute();
+  }, []);
+  const drawProjectRoute = () => {
+    if (!map.current) return;
+    const p = focusProject;
+    const proj = p && p.start_lat ? p : MOCK_PROJECTS[2];
+    const A = [proj.start_lat, proj.start_lng],
+      B = [proj.end_lat, proj.end_lng];
+    const mid = [(A[0] + B[0]) / 2 + 0.04, (A[1] + B[1]) / 2];
+    const line = L.polyline([A, mid, B], {
+      color: "#FF6B00",
+      weight: 5,
+      opacity: .95
+    }).addTo(map.current);
+    line.bindTooltip(proj.name + " · " + proj.length_km + " km", {
+      sticky: true
+    });
+    const pin = (latlng, col, lab) => L.marker(latlng, {
+      icon: L.divIcon({
+        className: "",
+        html: "<div style=\"background:".concat(col, ";color:#fff;width:28px;height:28px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:grid;place-items:center;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4)\"><span style=\"transform:rotate(45deg);font-weight:700;font-size:11px\">").concat(lab, "</span></div>"),
+        iconSize: [28, 28],
+        iconAnchor: [14, 28]
+      })
+    }).addTo(map.current);
+    pin(A, "#003087", "A");
+    pin(B, "#FF6B00", "B");
+    map.current.fitBounds([A, B], {
+      padding: [80, 80]
+    });
+  };
+  const buildOverlays = () => {
+    overlays.current.rivers = L.layerGroup(GEO.rivers.map(line => L.polyline(line, {
+      color: "#0ea5e9",
+      weight: 4,
+      opacity: .7
+    }).bindTooltip("River")));
+    overlays.current.forest = L.layerGroup(GEO.forest.map(poly => L.polygon(poly, {
+      color: "#16a34a",
+      fillColor: "#22c55e",
+      fillOpacity: .3,
+      weight: 1.5
+    }).bindTooltip("Reserved Forest")));
+    overlays.current.railways = L.layerGroup(GEO.railways.map(line => L.polyline(line, {
+      color: "#1e293b",
+      weight: 3,
+      dashArray: "10 6"
+    }).bindTooltip("Existing Railway")));
+    overlays.current.villages = L.layerGroup(GEO.villages.map(v => L.circleMarker(v.p, {
+      radius: 6,
+      color: "#fff",
+      weight: 2,
+      fillColor: "#9333ea",
+      fillOpacity: 1
+    }).bindTooltip(v.n, {
+      permanent: false
+    })));
+    overlays.current.elevation = L.layerGroup(GEO.elevation.map(e => L.circle(e.c, {
+      radius: e.r,
+      color: e.col,
+      fillColor: e.col,
+      fillOpacity: .25,
+      weight: 0
+    })));
+    // apply defaults
+    Object.keys(active).forEach(k => {
+      if (active[k] && overlays.current[k]) overlays.current[k].addTo(map.current);
+    });
+  };
+  const toggle = id => {
+    setActive(prev => {
+      const nv = _objectSpread(_objectSpread({}, prev), {}, {
+        [id]: !prev[id]
+      });
+      if (!map.current) return nv;
+      if (id === "satellite") {
+        if (nv.satellite) {
+          map.current.removeLayer(base.current.street);
+          base.current.sat.addTo(map.current);
+        } else {
+          map.current.removeLayer(base.current.sat);
+          base.current.street.addTo(map.current);
+        }
+      } else {
+        const ov = overlays.current[id];
+        if (ov) {
+          nv[id] ? ov.addTo(map.current) : map.current.removeLayer(ov);
+        }
+      }
+      return nv;
+    });
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "animate-fadein"
+  }, /*#__PURE__*/React.createElement(TopBar, {
+    title: "GIS Map Viewer",
+    subtitle: focusProject !== null && focusProject !== void 0 && focusProject.name ? "Showing: ".concat(focusProject.name) : "Terrain & alignment intelligence · Raipur, Chhattisgarh"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "w-64 shrink-0 bg-white rounded-2xl shadow-sm ring-1 ring-slate-100 p-4 h-fit"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2 mb-3"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDDC2"), /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-navy"
+  }, "Map Layers")), /*#__PURE__*/React.createElement("div", {
+    className: "space-y-2"
+  }, LAYERS.map(l => /*#__PURE__*/React.createElement("label", {
+    key: l.id,
+    className: "flex items-center justify-between gap-2 p-2.5 rounded-xl hover:bg-slate-50 cursor-pointer transition group"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "flex items-center gap-2 text-sm font-medium text-slate-700"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "w-7 h-7 rounded-lg grid place-items-center text-sm",
+    style: {
+      background: l.color + "22"
+    }
+  }, l.icon), l.label), /*#__PURE__*/React.createElement("button", {
+    onClick: () => toggle(l.id),
+    type: "button",
+    className: "relative w-10 h-5.5 rounded-full transition shrink-0 ".concat(active[l.id] ? "bg-emerald-500" : "bg-slate-300"),
+    style: {
+      height: 22,
+      width: 40
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ".concat(active[l.id] ? "left-[22px]" : "left-0.5"),
+    style: {
+      top: 3
+    }
+  }))))), /*#__PURE__*/React.createElement("div", {
+    className: "mt-4 pt-4 border-t border-slate-100"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-xs font-bold text-slate-400 uppercase mb-2"
+  }, "Legend"), /*#__PURE__*/React.createElement("div", {
+    className: "space-y-1.5 text-xs text-slate-600"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "w-4 h-1 rounded",
+    style: {
+      background: "#FF6B00"
+    }
+  }), "Proposed route"), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "w-4 h-1 rounded",
+    style: {
+      background: "#1e293b"
+    }
+  }), "Existing railway"), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "w-3 h-3 rounded-full",
+    style: {
+      background: "#22c55e"
+    }
+  }), "Forest area"), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "w-4 h-1 rounded",
+    style: {
+      background: "#0ea5e9"
+    }
+  }), "River")))), /*#__PURE__*/React.createElement("div", {
+    className: "flex-1 bg-white rounded-2xl shadow-sm ring-1 ring-slate-100 overflow-hidden"
+  }, /*#__PURE__*/React.createElement("div", {
+    ref: ref,
+    className: "w-full",
+    style: {
+      height: "calc(100vh - 230px)",
+      minHeight: 420
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-wrap items-center gap-x-6 gap-y-1 px-4 py-2.5 bg-navy text-white text-xs font-medium"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDCCD Lat: ", /*#__PURE__*/React.createElement("b", {
+    className: "tabular-nums"
+  }, coords[0].toFixed(4)), " \xB7 Lng: ", /*#__PURE__*/React.createElement("b", {
+    className: "tabular-nums"
+  }, coords[1].toFixed(4))), /*#__PURE__*/React.createElement("span", null, "\uD83D\uDD0D Zoom: ", /*#__PURE__*/React.createElement("b", null, zoom)), /*#__PURE__*/React.createElement("span", null, "\uD83D\uDCCF Scale: ", /*#__PURE__*/React.createElement("b", null, scale)), /*#__PURE__*/React.createElement("span", {
+    className: "ml-auto flex items-center gap-1.5"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "w-2 h-2 rounded-full bg-emerald-400 animate-pulse"
+  }), "EPSG:4326 \xB7 WGS-84")))));
+}
+
+/* ============================ Route Analysis (list) ============================ */
+function RouteAnalysis(_ref21) {
+  let openProject = _ref21.openProject,
+    onMap = _ref21.onMap,
+    onGenerate = _ref21.onGenerate;
+  const _useState51 = useState([]),
+    _useState52 = _slicedToArray(_useState51, 2),
+    projects = _useState52[0],
+    setProjects = _useState52[1];
+  const _useState53 = useState(true),
+    _useState54 = _slicedToArray(_useState53, 2),
+    loading = _useState54[0],
+    setLoading = _useState54[1];
+  useEffect(() => {
+    (async () => {
+      setProjects(await apiGet("/api/projects", MOCK_PROJECTS));
+      setLoading(false);
+    })();
+  }, []);
+  if (loading) return /*#__PURE__*/React.createElement("div", {
+    className: "grid place-items-center h-[70vh]"
+  }, /*#__PURE__*/React.createElement(Spinner, {
+    label: "Loading routes..."
+  }));
+  return /*#__PURE__*/React.createElement("div", {
+    className: "animate-fadein"
+  }, /*#__PURE__*/React.createElement(TopBar, {
+    title: "Route Analysis",
+    subtitle: "All analysed railway alignments"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
+  }, projects.map((p, i) => /*#__PURE__*/React.createElement("div", {
+    key: p.id,
+    className: "bg-white rounded-2xl shadow-sm ring-1 ring-slate-100 overflow-hidden hover:shadow-lg hover:-translate-y-1 transition animate-fadein",
+    style: {
+      animationDelay: "".concat(i * 60, "ms")
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "h-24 bg-gradient-to-br from-navy to-navy-600 relative p-4"
+  }, /*#__PURE__*/React.createElement(StatusBadge, {
+    status: p.status
+  }), /*#__PURE__*/React.createElement("svg", {
+    className: "absolute bottom-0 left-0 w-full h-12",
+    viewBox: "0 0 300 50",
+    preserveAspectRatio: "none"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M0,40 C60,10 120,45 180,20 S280,35 300,15",
+    stroke: "#FF6B00",
+    strokeWidth: "3",
+    fill: "none"
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "p-4"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-navy"
+  }, p.name), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-slate-400 mb-3"
+  }, p.zone, " Railway"), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-3 gap-2 text-center mb-3"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-slate-50 rounded-lg py-2"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-sm font-bold text-navy"
+  }, p.length_km), /*#__PURE__*/React.createElement("div", {
+    className: "text-[10px] text-slate-400"
+  }, "km")), /*#__PURE__*/React.createElement("div", {
+    className: "bg-slate-50 rounded-lg py-2"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-sm font-bold text-navy"
+  }, inFormat(p.cost_cr)), /*#__PURE__*/React.createElement("div", {
+    className: "text-[10px] text-slate-400"
+  }, "\u20B9 Cr cost")), /*#__PURE__*/React.createElement("div", {
+    className: "bg-emerald-50 rounded-lg py-2"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-sm font-bold text-emerald-600"
+  }, inFormat(p.cost_saved_cr)), /*#__PURE__*/React.createElement("div", {
+    className: "text-[10px] text-slate-400"
+  }, "\u20B9 Cr saved"))), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => onGenerate(p),
+    className: "flex-1 py-2 rounded-lg bg-rorange text-white text-sm font-semibold hover:bg-rorange-600 transition"
+  }, "\uD83E\uDD16 Generate Routes"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => onMap(p),
+    className: "px-3 py-2 rounded-lg bg-navy text-white text-sm font-semibold hover:bg-navy-600 transition"
+  }, "\uD83D\uDDFA Map"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => openProject(p),
+    className: "px-3 py-2 rounded-lg bg-white ring-1 ring-slate-200 text-navy text-sm font-semibold hover:bg-slate-50 transition"
+  }, "Details")))))));
+}
+
+/* ============================ DPR Generator ============================ */
+/* ============================ Phase 3: DPR Workspace ============================ */
+function ToastHost(_ref22) {
+  let toast = _ref22.toast;
+  if (!toast) return null;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "fixed bottom-6 right-6 z-[3000] animate-slidein"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-navy text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 ring-1 ring-white/10"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-lg"
+  }, toast.icon || "✅"), /*#__PURE__*/React.createElement("span", {
+    className: "text-sm font-semibold"
+  }, toast.msg)));
+}
+function CostBreakdown() {
+  const PieChart = RC.PieChart,
+    Pie = RC.Pie,
+    Cell = RC.Cell,
+    ResponsiveContainer = RC.ResponsiveContainer,
+    Tooltip = RC.Tooltip,
+    Legend = RC.Legend,
+    BarChart = RC.BarChart,
+    Bar = RC.Bar,
+    XAxis = RC.XAxis,
+    YAxis = RC.YAxis,
+    CartesianGrid = RC.CartesianGrid,
+    LabelList = RC.LabelList;
+  const toast = (m, i, setT) => {
+    setT({
+      msg: m,
+      icon: i
+    });
+    setTimeout(() => setT(null), 2600);
+  };
+  const _useState55 = useState(null),
+    _useState56 = _slicedToArray(_useState55, 2),
+    t = _useState56[0],
+    setT = _useState56[1];
+  const dl = async () => {
+    const w = await downloadFile("/api/export/boq.xlsx", "RaipurDurg_BOQ.xlsx", boqCsvFallback);
+    setT({
+      msg: w === "backend" ? "BOQ Excel downloaded" : "BOQ downloaded (CSV fallback)",
+      icon: "📊"
+    });
+    setTimeout(() => setT(null), 2600);
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "space-y-4 animate-fadein"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-1 lg:grid-cols-2 gap-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-2xl shadow-sm ring-1 ring-slate-100 p-5"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-navy mb-1"
+  }, "Cost Distribution"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-slate-400 mb-2"
+  }, "Route B (AI Optimized) \xB7 \u20B9 Crores"), /*#__PURE__*/React.createElement("div", {
+    className: "relative"
+  }, ResponsiveContainer && /*#__PURE__*/React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 280
+  }, /*#__PURE__*/React.createElement(PieChart, null, /*#__PURE__*/React.createElement(Pie, {
+    data: COST_SPLIT,
+    dataKey: "amount",
+    nameKey: "head",
+    innerRadius: 70,
+    outerRadius: 105,
+    paddingAngle: 2
+  }, COST_SPLIT.map((e, i) => /*#__PURE__*/React.createElement(Cell, {
+    key: i,
+    fill: e.color
+  }))), /*#__PURE__*/React.createElement(Tooltip, {
+    formatter: (v, n) => [cr(v), n],
+    contentStyle: {
+      borderRadius: 12,
+      border: "none",
+      boxShadow: "0 8px 30px rgba(0,0,0,.12)"
+    }
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "absolute inset-0 flex flex-col items-center justify-center pointer-events-none",
+    style: {
+      top: "-30px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-2xl font-black text-navy"
+  }, cr(TOTAL_COST)), /*#__PURE__*/React.createElement("div", {
+    className: "text-xs text-slate-400"
+  }, "Total Project Cost"))), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-2 mt-2"
+  }, COST_SPLIT.map(c => /*#__PURE__*/React.createElement("div", {
+    key: c.head,
+    className: "flex items-center gap-2 text-xs"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "w-3 h-3 rounded-sm",
+    style: {
+      background: c.color
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-600 flex-1"
+  }, c.head), /*#__PURE__*/React.createElement("span", {
+    className: "font-bold text-navy"
+  }, c.pct, "%"))))), /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-2xl shadow-sm ring-1 ring-slate-100 p-5"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-navy mb-1"
+  }, "Cost Comparison \u2014 All Routes"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-slate-400 mb-2"
+  }, "\u20B9 Crores \xB7 lower is better"), ResponsiveContainer && /*#__PURE__*/React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 300
+  }, /*#__PURE__*/React.createElement(BarChart, {
+    data: ROUTE_COSTS,
+    margin: {
+      top: 24,
+      right: 10,
+      left: -10,
+      bottom: 0
+    }
+  }, /*#__PURE__*/React.createElement(CartesianGrid, {
+    strokeDasharray: "3 3",
+    stroke: "#eef2f7",
+    vertical: false
+  }), /*#__PURE__*/React.createElement(XAxis, {
+    dataKey: "name",
+    tick: {
+      fontSize: 11,
+      fill: "#64748b"
+    },
+    axisLine: false,
+    tickLine: false
+  }), /*#__PURE__*/React.createElement(YAxis, {
+    tick: {
+      fontSize: 11,
+      fill: "#94a3b8"
+    },
+    axisLine: false,
+    tickLine: false
+  }), /*#__PURE__*/React.createElement(Tooltip, {
+    formatter: v => cr(v),
+    cursor: {
+      fill: "#f8fafc"
+    },
+    contentStyle: {
+      borderRadius: 12,
+      border: "none",
+      boxShadow: "0 8px 30px rgba(0,0,0,.12)"
+    }
+  }), /*#__PURE__*/React.createElement(Bar, {
+    dataKey: "cost",
+    radius: [8, 8, 0, 0],
+    barSize: 64
+  }, ROUTE_COSTS.map((e, i) => /*#__PURE__*/React.createElement(Cell, {
+    key: i,
+    fill: e.color
+  })), /*#__PURE__*/React.createElement(LabelList, {
+    dataKey: "cost",
+    position: "top",
+    formatter: v => "₹" + inFormat(v),
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      fill: "#003087"
+    }
+  })))), /*#__PURE__*/React.createElement("div", {
+    className: "mt-2 text-center text-xs text-emerald-600 font-semibold bg-emerald-50 rounded-lg py-2"
+  }, "\u2705 Route B is \u20B9158 Cr cheaper than Route A and \u20B9214 Cr cheaper than Route C"))), /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-2xl shadow-sm ring-1 ring-slate-100 overflow-hidden"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between p-5 pb-3"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-navy"
+  }, "Bill of Quantities"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-slate-400"
+  }, "20 standard Indian Railways items")), /*#__PURE__*/React.createElement("button", {
+    onClick: dl,
+    className: "px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm shadow-lg shadow-emerald-200 transition active:scale-95"
+  }, "\u2B07 Download BOQ (Excel)")), /*#__PURE__*/React.createElement("div", {
+    className: "overflow-x-auto"
+  }, /*#__PURE__*/React.createElement("table", {
+    className: "w-full text-xs"
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", {
+    className: "bg-navy text-white text-left"
+  }, /*#__PURE__*/React.createElement("th", {
+    className: "px-3 py-2.5 font-semibold"
+  }, "Sr"), /*#__PURE__*/React.createElement("th", {
+    className: "px-3 py-2.5 font-semibold"
+  }, "Item"), /*#__PURE__*/React.createElement("th", {
+    className: "px-3 py-2.5 font-semibold"
+  }, "Unit"), /*#__PURE__*/React.createElement("th", {
+    className: "px-3 py-2.5 font-semibold text-right"
+  }, "Qty"), /*#__PURE__*/React.createElement("th", {
+    className: "px-3 py-2.5 font-semibold text-right"
+  }, "Rate (\u20B9)"), /*#__PURE__*/React.createElement("th", {
+    className: "px-3 py-2.5 font-semibold text-right"
+  }, "Amount (\u20B9 Cr)"))), /*#__PURE__*/React.createElement("tbody", null, BOQ.map((r, i) => /*#__PURE__*/React.createElement("tr", {
+    key: i,
+    className: i % 2 ? "bg-slate-50" : "bg-white"
+  }, /*#__PURE__*/React.createElement("td", {
+    className: "px-3 py-2 text-slate-400"
+  }, r[0]), /*#__PURE__*/React.createElement("td", {
+    className: "px-3 py-2 font-medium text-slate-700"
+  }, r[1]), /*#__PURE__*/React.createElement("td", {
+    className: "px-3 py-2 text-slate-500"
+  }, r[2]), /*#__PURE__*/React.createElement("td", {
+    className: "px-3 py-2 text-right tabular-nums text-slate-600"
+  }, r[3]), /*#__PURE__*/React.createElement("td", {
+    className: "px-3 py-2 text-right tabular-nums text-slate-600"
+  }, r[4]), /*#__PURE__*/React.createElement("td", {
+    className: "px-3 py-2 text-right tabular-nums font-semibold text-navy"
+  }, r[5]))), /*#__PURE__*/React.createElement("tr", {
+    className: "bg-navy text-white font-bold"
+  }, /*#__PURE__*/React.createElement("td", {
+    className: "px-3 py-2.5",
+    colSpan: 5
+  }, "TOTAL"), /*#__PURE__*/React.createElement("td", {
+    className: "px-3 py-2.5 text-right tabular-nums"
+  }, "1,172.73")))))), /*#__PURE__*/React.createElement(ToastHost, {
+    toast: t
+  }));
+}
+function LandAcquisition() {
+  const PieChart = RC.PieChart,
+    Pie = RC.Pie,
+    Cell = RC.Cell,
+    ResponsiveContainer = RC.ResponsiveContainer,
+    Tooltip = RC.Tooltip;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "space-y-4 animate-fadein"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-1 md:grid-cols-4 gap-4"
+  }, [{
+    l: "Total Corridor Area",
+    v: LAND_SUMMARY.total_ha + " ha",
+    i: "📐",
+    a: "bg-blue-50 text-navy"
+  }, {
+    l: "Affected Households",
+    v: inFormat(LAND_SUMMARY.households),
+    i: "🏠",
+    a: "bg-orange-50 text-rorange"
+  }, {
+    l: "Compensation Estimate",
+    v: cr(LAND_SUMMARY.compensation_cr),
+    i: "💰",
+    a: "bg-emerald-50 text-emerald-600"
+  }, {
+    l: "Timeline Estimate",
+    v: LAND_SUMMARY.timeline,
+    i: "⏱",
+    a: "bg-violet-50 text-violet-600"
+  }].map((s, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    className: "bg-white rounded-2xl shadow-sm ring-1 ring-slate-100 p-5 animate-fadein",
+    style: {
+      animationDelay: "".concat(i * 70, "ms")
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "w-11 h-11 rounded-xl grid place-items-center text-xl ".concat(s.a, " mb-3")
+  }, s.i), /*#__PURE__*/React.createElement("div", {
+    className: "text-2xl font-extrabold text-navy"
+  }, s.v), /*#__PURE__*/React.createElement("div", {
+    className: "text-sm text-slate-500 mt-0.5"
+  }, s.l)))), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-1 lg:grid-cols-2 gap-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-2xl shadow-sm ring-1 ring-slate-100 p-5"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-navy mb-1"
+  }, "Land Use Breakdown"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-slate-400 mb-2"
+  }, LAND_SUMMARY.total_ha, " hectares total"), ResponsiveContainer && /*#__PURE__*/React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 260
+  }, /*#__PURE__*/React.createElement(PieChart, null, /*#__PURE__*/React.createElement(Pie, {
+    data: LAND_USE,
+    dataKey: "pct",
+    nameKey: "type",
+    outerRadius: 100,
+    label: e => "".concat(e.type, " ").concat(e.pct, "%"),
+    labelLine: false,
+    style: {
+      fontSize: 11
+    }
+  }, LAND_USE.map((e, i) => /*#__PURE__*/React.createElement(Cell, {
+    key: i,
+    fill: e.color
+  }))), /*#__PURE__*/React.createElement(Tooltip, {
+    formatter: (v, n, p) => ["".concat(v, "% \xB7 ").concat(p.payload.ha, " ha"), n],
+    contentStyle: {
+      borderRadius: 12,
+      border: "none",
+      boxShadow: "0 8px 30px rgba(0,0,0,.12)"
+    }
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-2 mt-1"
+  }, LAND_USE.map(u => /*#__PURE__*/React.createElement("div", {
+    key: u.type,
+    className: "flex items-center gap-2 text-xs"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "w-3 h-3 rounded-sm",
+    style: {
+      background: u.color
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-600 flex-1"
+  }, u.type), /*#__PURE__*/React.createElement("span", {
+    className: "font-bold text-navy"
+  }, u.ha, " ha"))))), /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-2xl shadow-sm ring-1 ring-slate-100 p-5"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-navy mb-1"
+  }, "Affected Villages"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-slate-400 mb-3"
+  }, LAND_SUMMARY.villages.length, " villages along Route B corridor"), /*#__PURE__*/React.createElement("div", {
+    className: "space-y-2"
+  }, LAND_SUMMARY.villages.map((v, i) => {
+    const ha = [64.2, 51.8, 58.9, 40.5][i],
+      hh = [72, 54, 61, 47][i];
+    return /*#__PURE__*/React.createElement("div", {
+      key: v,
+      className: "flex items-center gap-3 p-3 rounded-xl bg-slate-50 hover:bg-orange-50/50 transition"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "w-9 h-9 rounded-lg bg-navy text-white grid place-items-center text-sm font-bold"
+    }, v[0]), /*#__PURE__*/React.createElement("div", {
+      className: "flex-1"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "font-semibold text-navy text-sm"
+    }, v), /*#__PURE__*/React.createElement("div", {
+      className: "text-xs text-slate-400"
+    }, hh, " households affected")), /*#__PURE__*/React.createElement("div", {
+      className: "text-right"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "font-bold text-navy text-sm"
+    }, ha, " ha"), /*#__PURE__*/React.createElement("div", {
+      className: "text-[10px] text-slate-400"
+    }, "to acquire")));
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "mt-3 rounded-xl bg-amber-50 ring-1 ring-amber-200 p-3 text-xs text-amber-700"
+  }, "\u26A0\uFE0F Social Impact Assessment & R&R plan required under RFCTLARR Act, 2013 before acquisition."))));
+}
+function TimelineView() {
+  const yrs = Array.from({
+    length: Math.ceil(TIMELINE_TOTAL / 12)
+  }, (_, i) => i + 1);
+  return /*#__PURE__*/React.createElement("div", {
+    className: "space-y-4 animate-fadein"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-gradient-to-r from-navy to-navy-600 rounded-2xl p-5 text-white flex items-center justify-between"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-lg"
+  }, "Implementation Schedule"), /*#__PURE__*/React.createElement("p", {
+    className: "text-blue-100/70 text-sm"
+  }, "6 phases \xB7 overlapping execution")), /*#__PURE__*/React.createElement("div", {
+    className: "text-right"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-3xl font-black"
+  }, "~7 years"), /*#__PURE__*/React.createElement("div", {
+    className: "text-blue-100/70 text-sm"
+  }, "total duration"))), /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-2xl shadow-sm ring-1 ring-slate-100 p-5 overflow-x-auto"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center mb-3 pl-[220px] min-w-[760px]"
+  }, yrs.map(y => /*#__PURE__*/React.createElement("div", {
+    key: y,
+    className: "flex-1 text-xs font-semibold text-slate-400 text-center border-l border-slate-100"
+  }, "Year ", y))), /*#__PURE__*/React.createElement("div", {
+    className: "space-y-3 min-w-[760px]"
+  }, TIMELINE.map((t, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    className: "flex items-center animate-slidein",
+    style: {
+      animationDelay: "".concat(i * 90, "ms")
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "w-[220px] shrink-0 pr-3 text-sm font-semibold text-navy"
+  }, t.phase, /*#__PURE__*/React.createElement("div", {
+    className: "text-xs text-slate-400 font-normal"
+  }, t.months, " months")), /*#__PURE__*/React.createElement("div", {
+    className: "flex-1 relative h-9 bg-slate-50 rounded-lg"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "absolute top-1 bottom-1 rounded-md flex items-center justify-center text-[11px] font-bold text-white shadow transition-all duration-700",
+    style: {
+      left: "".concat(t.start / TIMELINE_TOTAL * 100, "%"),
+      width: "".concat(t.months / TIMELINE_TOTAL * 100, "%"),
+      background: t.color
+    }
+  }, t.months, "m")))))), /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-2xl shadow-sm ring-1 ring-slate-100 overflow-hidden"
+  }, /*#__PURE__*/React.createElement("table", {
+    className: "w-full text-sm"
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", {
+    className: "bg-navy text-white text-left"
+  }, /*#__PURE__*/React.createElement("th", {
+    className: "px-4 py-2.5 font-semibold"
+  }, "Phase"), /*#__PURE__*/React.createElement("th", {
+    className: "px-4 py-2.5 font-semibold"
+  }, "Duration"), /*#__PURE__*/React.createElement("th", {
+    className: "px-4 py-2.5 font-semibold"
+  }, "Starts"), /*#__PURE__*/React.createElement("th", {
+    className: "px-4 py-2.5 font-semibold"
+  }, "Finishes"))), /*#__PURE__*/React.createElement("tbody", null, TIMELINE.map((t, i) => /*#__PURE__*/React.createElement("tr", {
+    key: i,
+    className: i % 2 ? "bg-slate-50" : "bg-white"
+  }, /*#__PURE__*/React.createElement("td", {
+    className: "px-4 py-2.5 font-medium text-navy"
+  }, t.phase), /*#__PURE__*/React.createElement("td", {
+    className: "px-4 py-2.5 text-slate-600"
+  }, t.months, " months"), /*#__PURE__*/React.createElement("td", {
+    className: "px-4 py-2.5 text-slate-500"
+  }, "Month ", t.start), /*#__PURE__*/React.createElement("td", {
+    className: "px-4 py-2.5 text-slate-500"
+  }, "Month ", t.start + t.months))), /*#__PURE__*/React.createElement("tr", {
+    className: "bg-orange-50 font-bold text-navy"
+  }, /*#__PURE__*/React.createElement("td", {
+    className: "px-4 py-2.5"
+  }, "TOTAL (overlapping)"), /*#__PURE__*/React.createElement("td", {
+    className: "px-4 py-2.5"
+  }, "~7 years"), /*#__PURE__*/React.createElement("td", {
+    className: "px-4 py-2.5"
+  }, "Month 0"), /*#__PURE__*/React.createElement("td", {
+    className: "px-4 py-2.5"
+  }, "Month ", TIMELINE_TOTAL))))));
+}
+function DPRDocTab() {
+  const _useState57 = useState("idle"),
+    _useState58 = _slicedToArray(_useState57, 2),
+    stage = _useState58[0],
+    setStage = _useState58[1]; // idle | gen | done
+  const _useState59 = useState(0),
+    _useState60 = _slicedToArray(_useState59, 2),
+    msg = _useState60[0],
+    setMsg = _useState60[1];
+  const _useState61 = useState(null),
+    _useState62 = _slicedToArray(_useState61, 2),
+    t = _useState62[0],
+    setT = _useState62[1];
+  const dprMsgs = ["Compiling alignment & survey data...", "Assembling cost estimate & BOQ...", "Rendering professional DPR document..."];
+  const gen = () => {
+    setStage("gen");
+    setMsg(0);
+    const it = setInterval(() => setMsg(v => Math.min(v + 1, dprMsgs.length - 1)), 1000);
+    setTimeout(() => {
+      clearInterval(it);
+      setStage("done");
+    }, 3000);
+  };
+  const dl = async () => {
+    const w = await downloadFile("/api/export/dpr.pdf", "RaipurDurg_DPR.pdf", null);
+    setT({
+      msg: w === "backend" ? "DPR PDF downloaded" : "Start backend to download PDF",
+      icon: w === "backend" ? "📄" : "⚠️"
+    });
+    setTimeout(() => setT(null), 3000);
+  };
+  const sections = ["Executive Summary", "Project Background & Objectives", "Route Survey Details", "Terrain & Gradient Analysis", "Hydrology & Bridge Schedule", "Land Acquisition Details", "Environmental Considerations", "Detailed Cost Estimate", "Bill of Quantities", "Implementation Schedule", "Conclusion & Recommendations"];
+  return /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-1 lg:grid-cols-2 gap-4 animate-fadein"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-2xl shadow-sm ring-1 ring-slate-100 p-6"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "aspect-[1/1.414] rounded-xl border border-slate-200 shadow-inner bg-gradient-to-b from-white to-slate-50 p-6 flex flex-col items-center text-center"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "w-16 h-16 rounded-lg bg-navy ring-2 ring-rorange grid place-items-center text-white text-[8px] font-bold leading-tight mb-3"
+  }, "GOVT", /*#__PURE__*/React.createElement("br", null), "OF", /*#__PURE__*/React.createElement("br", null), "INDIA"), /*#__PURE__*/React.createElement("div", {
+    className: "text-[10px] text-slate-400 tracking-wide"
+  }, "GOVERNMENT OF INDIA \xB7 MINISTRY OF RAILWAYS"), /*#__PURE__*/React.createElement("div", {
+    className: "text-xl font-black text-navy mt-3"
+  }, "DETAILED PROJECT REPORT"), /*#__PURE__*/React.createElement("div", {
+    className: "w-20 h-1 bg-rorange rounded my-2"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "text-base font-bold text-rorange mt-2"
+  }, "Raipur - Durg New Railway Line"), /*#__PURE__*/React.createElement("div", {
+    className: "text-[11px] text-slate-500 mt-1"
+  }, "Route B \u2014 AI Optimized \xB7 71.8 km \xB7 Broad Gauge"), /*#__PURE__*/React.createElement("div", {
+    className: "mt-auto w-full text-left text-[11px] text-slate-500 space-y-1 border-t border-slate-100 pt-3"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex justify-between"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-400"
+  }, "Railway Zone"), /*#__PURE__*/React.createElement("span", {
+    className: "font-semibold"
+  }, "South East Central")), /*#__PURE__*/React.createElement("div", {
+    className: "flex justify-between"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-400"
+  }, "Prepared by"), /*#__PURE__*/React.createElement("span", {
+    className: "font-semibold"
+  }, "RailPlan AI Platform")), /*#__PURE__*/React.createElement("div", {
+    className: "flex justify-between"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-400"
+  }, "Estimated Cost"), /*#__PURE__*/React.createElement("span", {
+    className: "font-semibold"
+  }, "\u20B91,298 Cr"))))), /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-2xl shadow-sm ring-1 ring-slate-100 p-6 flex flex-col"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-navy text-lg"
+  }, "Professional DPR Document"), /*#__PURE__*/React.createElement("p", {
+    className: "text-sm text-slate-500 mb-4"
+  }, "11-section formatted report with cover page, tables & schedules."), /*#__PURE__*/React.createElement("div", {
+    className: "flex-1"
+  }, stage === "idle" && /*#__PURE__*/React.createElement("div", {
+    className: "border border-slate-200 rounded-xl divide-y divide-slate-100 text-sm"
+  }, sections.map((s, i) => /*#__PURE__*/React.createElement("div", {
+    key: s,
+    className: "flex items-center justify-between px-4 py-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-700"
+  }, i + 1, ". ", s), /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-300 text-xs"
+  }, "pending")))), stage === "gen" && /*#__PURE__*/React.createElement("div", {
+    className: "py-10"
+  }, /*#__PURE__*/React.createElement(Spinner, {
+    label: dprMsgs[msg]
+  })), stage === "done" && /*#__PURE__*/React.createElement("div", {
+    className: "animate-scalein"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-3 mb-4 bg-emerald-50 rounded-xl p-4 ring-1 ring-emerald-200"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "w-11 h-11 rounded-full bg-emerald-500 text-white grid place-items-center text-xl"
+  }, "\u2713"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "font-bold text-navy"
+  }, "DPR Generated Successfully \u2705"), /*#__PURE__*/React.createElement("div", {
+    className: "text-xs text-slate-500"
+  }, "RaipurDurg_DPR.pdf \xB7 6 pages \xB7 ready"))), /*#__PURE__*/React.createElement("div", {
+    className: "border border-slate-200 rounded-xl divide-y divide-slate-100 text-sm max-h-[260px] overflow-y-auto"
+  }, sections.map((s, i) => /*#__PURE__*/React.createElement("div", {
+    key: s,
+    className: "flex items-center justify-between px-4 py-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-700"
+  }, i + 1, ". ", s), /*#__PURE__*/React.createElement("span", {
+    className: "text-emerald-600 text-xs font-semibold"
+  }, "\u2713 generated")))))), /*#__PURE__*/React.createElement("div", {
+    className: "mt-5"
+  }, stage !== "done" ? /*#__PURE__*/React.createElement("button", {
+    disabled: stage === "gen",
+    onClick: gen,
+    className: "w-full py-3 rounded-xl bg-rorange hover:bg-rorange-600 disabled:opacity-60 text-white font-bold shadow-lg shadow-rorange/20 transition active:scale-95"
+  }, stage === "gen" ? "Generating…" : "📄 Generate DPR") : /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: dl,
+    className: "flex-1 py-3 rounded-xl bg-navy hover:bg-navy-600 text-white font-bold transition active:scale-95"
+  }, "\u2B07 Download PDF"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setStage("idle"),
+    className: "px-4 py-3 rounded-xl bg-white ring-1 ring-slate-200 text-navy font-semibold hover:bg-slate-50 transition"
+  }, "Reset")))), /*#__PURE__*/React.createElement(ToastHost, {
+    toast: t
+  }));
+}
+function DPRGenerator() {
+  const _useState63 = useState("cost"),
+    _useState64 = _slicedToArray(_useState63, 2),
+    tab = _useState64[0],
+    setTab = _useState64[1];
+  const _useState65 = useState(false),
+    _useState66 = _slicedToArray(_useState65, 2),
+    showCompare = _useState66[0],
+    setShowCompare = _useState66[1];
+  const _useState67 = useState(null),
+    _useState68 = _slicedToArray(_useState67, 2),
+    toast = _useState68[0],
+    setToast = _useState68[1];
+  const tabs = [{
+    id: "cost",
+    label: "Cost Breakdown",
+    icon: "💰"
+  }, {
+    id: "land",
+    label: "Land Acquisition",
+    icon: "🏞"
+  }, {
+    id: "timeline",
+    label: "Project Timeline",
+    icon: "📅"
+  }, {
+    id: "dpr",
+    label: "DPR Document",
+    icon: "📄"
+  }];
+  const fire = (m, i) => {
+    setToast({
+      msg: m,
+      icon: i
+    });
+    setTimeout(() => setToast(null), 2600);
+  };
+  const exportDPR = async () => {
+    const w = await downloadFile("/api/export/dpr.pdf", "RaipurDurg_DPR.pdf", null);
+    fire(w === "backend" ? "DPR PDF downloaded" : "Start backend for PDF export", w === "backend" ? "📄" : "⚠️");
+  };
+  const exportBOQ = async () => {
+    const w = await downloadFile("/api/export/boq.xlsx", "RaipurDurg_BOQ.xlsx", boqCsvFallback);
+    fire(w === "backend" ? "BOQ Excel downloaded" : "BOQ downloaded (CSV fallback)", "📊");
+  };
+  const exportKML = async () => {
+    const w = await downloadFile("/api/export/route.kml", "RaipurDurg_Route.kml", kmlFallback);
+    fire("Route KML downloaded — open in Google Earth", "🌍");
+  };
+  const shareLink = () => {
+    const url = "https://railplan.ai/p/raipur-durg-b";
+    if (navigator.clipboard) navigator.clipboard.writeText(url).catch(() => {});
+    fire("Project link copied to clipboard", "🔗");
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "animate-fadein"
+  }, /*#__PURE__*/React.createElement(TopBar, {
+    title: "DPR Workspace",
+    subtitle: "Raipur - Durg New Railway Line \xB7 Route B (AI Optimized)"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowCompare(true),
+    className: "px-4 py-2.5 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-50 text-navy font-semibold text-sm transition"
+  }, "\u2696 Compare with Traditional")), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-1 xl:grid-cols-4 gap-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "xl:col-span-3"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-1.5 bg-white rounded-2xl shadow-sm ring-1 ring-slate-100 p-1.5 mb-4 overflow-x-auto"
+  }, tabs.map(tb => /*#__PURE__*/React.createElement("button", {
+    key: tb.id,
+    onClick: () => setTab(tb.id),
+    className: "flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition\n                  ".concat(tab === tb.id ? "bg-navy text-white shadow" : "text-slate-500 hover:bg-slate-50")
+  }, /*#__PURE__*/React.createElement("span", null, tb.icon), tb.label))), tab === "cost" && /*#__PURE__*/React.createElement(CostBreakdown, null), tab === "land" && /*#__PURE__*/React.createElement(LandAcquisition, null), tab === "timeline" && /*#__PURE__*/React.createElement(TimelineView, null), tab === "dpr" && /*#__PURE__*/React.createElement(DPRDocTab, null)), /*#__PURE__*/React.createElement("div", {
+    className: "space-y-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-gradient-to-br from-navy to-navy-600 rounded-2xl shadow-lg p-5 text-white"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2 mb-3"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-xl"
+  }, "\uD83E\uDD16"), /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold"
+  }, "AI Insights")), /*#__PURE__*/React.createElement("div", {
+    className: "space-y-2.5"
+  }, DPR_INSIGHTS.map((a, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    className: "bg-white/10 backdrop-blur rounded-xl p-3 flex items-start gap-2.5 animate-slidein",
+    style: {
+      animationDelay: "".concat(i * 100, "ms")
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-lg"
+  }, a.icon), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-blue-100/90 leading-relaxed"
+  }, a.text))))), /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-2xl shadow-sm ring-1 ring-slate-100 p-5"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-navy mb-3 flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDCE4"), "Export Options"), /*#__PURE__*/React.createElement("div", {
+    className: "space-y-2"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: exportDPR,
+    className: "w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-50 hover:bg-navy hover:text-white text-navy font-semibold text-sm transition group"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-lg"
+  }, "\uD83D\uDCC4"), /*#__PURE__*/React.createElement("span", {
+    className: "flex-1 text-left"
+  }, "Download DPR ", /*#__PURE__*/React.createElement("span", {
+    className: "text-xs opacity-60"
+  }, "(PDF)")), /*#__PURE__*/React.createElement("span", {
+    className: "opacity-40 group-hover:opacity-100"
+  }, "\u2192")), /*#__PURE__*/React.createElement("button", {
+    onClick: exportBOQ,
+    className: "w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-50 hover:bg-emerald-600 hover:text-white text-navy font-semibold text-sm transition group"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-lg"
+  }, "\uD83D\uDCCA"), /*#__PURE__*/React.createElement("span", {
+    className: "flex-1 text-left"
+  }, "Download BOQ ", /*#__PURE__*/React.createElement("span", {
+    className: "text-xs opacity-60"
+  }, "(Excel)")), /*#__PURE__*/React.createElement("span", {
+    className: "opacity-40 group-hover:opacity-100"
+  }, "\u2192")), /*#__PURE__*/React.createElement("button", {
+    onClick: exportKML,
+    className: "w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-50 hover:bg-sky-600 hover:text-white text-navy font-semibold text-sm transition group"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-lg"
+  }, "\uD83C\uDF0D"), /*#__PURE__*/React.createElement("span", {
+    className: "flex-1 text-left"
+  }, "Download Route ", /*#__PURE__*/React.createElement("span", {
+    className: "text-xs opacity-60"
+  }, "(KML)")), /*#__PURE__*/React.createElement("span", {
+    className: "opacity-40 group-hover:opacity-100"
+  }, "\u2192")), /*#__PURE__*/React.createElement("button", {
+    onClick: shareLink,
+    className: "w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-50 hover:bg-rorange hover:text-white text-navy font-semibold text-sm transition group"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-lg"
+  }, "\uD83D\uDD17"), /*#__PURE__*/React.createElement("span", {
+    className: "flex-1 text-left"
+  }, "Share Project Link"), /*#__PURE__*/React.createElement("span", {
+    className: "opacity-40 group-hover:opacity-100"
+  }, "\u2192")))))), showCompare && /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 z-[1500] bg-navy-900/50 backdrop-blur-sm grid place-items-center p-4 animate-fadein",
+    onClick: () => setShowCompare(false)
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-2xl shadow-2xl w-full max-w-2xl animate-scalein",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-gradient-to-r from-navy to-navy-600 rounded-t-2xl p-5 text-white flex items-center justify-between"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", {
+    className: "text-xl font-extrabold"
+  }, "RailPlan AI vs Traditional Method"), /*#__PURE__*/React.createElement("p", {
+    className: "text-blue-100/70 text-sm"
+  }, "Route planning & DPR preparation")), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowCompare(false),
+    className: "w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 grid place-items-center transition"
+  }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+    className: "p-6 grid grid-cols-2 gap-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "rounded-2xl ring-1 ring-slate-200 p-5"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-xs font-bold text-slate-400 uppercase"
+  }, "Traditional Method"), /*#__PURE__*/React.createElement("div", {
+    className: "space-y-3 mt-3 text-sm"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDD53"), /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-600"
+  }, "Time: ", /*#__PURE__*/React.createElement("b", {
+    className: "text-navy"
+  }, "18 months"))), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDC77"), /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-600"
+  }, "Team: ", /*#__PURE__*/React.createElement("b", {
+    className: "text-navy"
+  }, "50 engineers"))), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDCD0"), /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-600"
+  }, "Routes evaluated: ", /*#__PURE__*/React.createElement("b", {
+    className: "text-navy"
+  }, "1-2"))), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDCC4"), /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-600"
+  }, "Manual DPR drafting")))), /*#__PURE__*/React.createElement("div", {
+    className: "rounded-2xl ring-2 ring-emerald-400 bg-emerald-50/40 p-5 relative"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "absolute -top-2.5 right-3 bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full"
+  }, "94% FASTER \u2705"), /*#__PURE__*/React.createElement("div", {
+    className: "text-xs font-bold text-emerald-600 uppercase"
+  }, "RailPlan AI"), /*#__PURE__*/React.createElement("div", {
+    className: "space-y-3 mt-3 text-sm"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("span", null, "\u26A1"), /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-600"
+  }, "Time: ", /*#__PURE__*/React.createElement("b", {
+    className: "text-emerald-700"
+  }, "4 hours"))), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83D\uDC64"), /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-600"
+  }, "Team: ", /*#__PURE__*/React.createElement("b", {
+    className: "text-emerald-700"
+  }, "2 engineers"))), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83E\uDDED"), /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-600"
+  }, "Routes evaluated: ", /*#__PURE__*/React.createElement("b", {
+    className: "text-emerald-700"
+  }, "3 + optimised"))), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83E\uDD16"), /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-600"
+  }, "Auto DPR + BOQ + KML"))))), /*#__PURE__*/React.createElement("div", {
+    className: "px-6 pb-6"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "rounded-xl bg-navy text-white p-4 flex items-center justify-around text-center"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "text-2xl font-black text-rorange"
+  }, "94%"), /*#__PURE__*/React.createElement("div", {
+    className: "text-xs text-blue-100/70"
+  }, "faster")), /*#__PURE__*/React.createElement("div", {
+    className: "w-px h-10 bg-white/15"
+  }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "text-2xl font-black text-rorange"
+  }, "96%"), /*#__PURE__*/React.createElement("div", {
+    className: "text-xs text-blue-100/70"
+  }, "fewer staff")), /*#__PURE__*/React.createElement("div", {
+    className: "w-px h-10 bg-white/15"
+  }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "text-2xl font-black text-rorange"
+  }, "\u20B9214 Cr"), /*#__PURE__*/React.createElement("div", {
+    className: "text-xs text-blue-100/70"
+  }, "cost optimised")))))), /*#__PURE__*/React.createElement(ToastHost, {
+    toast: toast
+  }));
+}
+
+/* ============================ Project Detail Modal ============================ */
+function ProjectModal(_ref23) {
+  let project = _ref23.project,
+    onClose = _ref23.onClose,
+    onMap = _ref23.onMap,
+    onGenerate = _ref23.onGenerate;
+  if (!project) return null;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 z-[1000] bg-navy-900/50 backdrop-blur-sm grid place-items-center p-4 animate-fadein",
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-scalein",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-gradient-to-br from-navy to-navy-600 rounded-t-2xl p-6 text-white relative"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    className: "absolute top-4 right-4 w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 grid place-items-center transition"
+  }, "\u2715"), /*#__PURE__*/React.createElement(StatusBadge, {
+    status: project.status
+  }), /*#__PURE__*/React.createElement("h2", {
+    className: "text-2xl font-extrabold mt-3"
+  }, project.name), /*#__PURE__*/React.createElement("p", {
+    className: "text-blue-100/70 text-sm"
+  }, project.zone, " Railway Zone")), /*#__PURE__*/React.createElement("div", {
+    className: "p-6"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-sm text-slate-600 mb-5"
+  }, project.description), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-3 gap-3 mb-5"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-slate-50 rounded-xl p-3 text-center"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-xl font-bold text-navy"
+  }, project.length_km), /*#__PURE__*/React.createElement("div", {
+    className: "text-xs text-slate-400"
+  }, "km length")), /*#__PURE__*/React.createElement("div", {
+    className: "bg-slate-50 rounded-xl p-3 text-center"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-xl font-bold text-navy"
+  }, inFormat(project.cost_cr)), /*#__PURE__*/React.createElement("div", {
+    className: "text-xs text-slate-400"
+  }, "\u20B9 Cr cost")), /*#__PURE__*/React.createElement("div", {
+    className: "bg-emerald-50 rounded-xl p-3 text-center"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-xl font-bold text-emerald-600"
+  }, inFormat(project.cost_saved_cr)), /*#__PURE__*/React.createElement("div", {
+    className: "text-xs text-slate-400"
+  }, "\u20B9 Cr saved"))), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      onClose();
+      onGenerate(project);
+    },
+    className: "flex-1 py-3 rounded-xl bg-rorange hover:bg-rorange-600 text-white font-bold transition active:scale-95"
+  }, "\uD83E\uDD16 Generate Routes"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      onClose();
+      onMap(project);
+    },
+    className: "px-4 py-3 rounded-xl bg-navy hover:bg-navy-600 text-white font-bold transition active:scale-95"
+  }, "\uD83D\uDDFA Map")))));
+}
+
+/* ============================ App Shell ============================ */
+function App() {
+  const _useState69 = useState(() => {
+      try {
+        const s = sessionStorage.getItem("railplan_user");
+        return s ? JSON.parse(s) : null;
+      } catch (e) {
+        return null;
+      }
+    }),
+    _useState70 = _slicedToArray(_useState69, 2),
+    user = _useState70[0],
+    setUser = _useState70[1];
+  useEffect(() => {
+    try {
+      if (user) sessionStorage.setItem("railplan_user", JSON.stringify(user));else sessionStorage.removeItem("railplan_user");
+    } catch (e) {}
+  }, [user]);
+  const _useState71 = useState("dashboard"),
+    _useState72 = _slicedToArray(_useState71, 2),
+    page = _useState72[0],
+    setPage = _useState72[1];
+  const _useState73 = useState(null),
+    _useState74 = _slicedToArray(_useState73, 2),
+    genProject = _useState74[0],
+    setGenProject = _useState74[1];
+  const _useState75 = useState(false),
+    _useState76 = _slicedToArray(_useState75, 2),
+    working = _useState76[0],
+    setWorking = _useState76[1]; // Phase 2 full-screen overlay
+  const _useState77 = useState(null),
+    _useState78 = _slicedToArray(_useState77, 2),
+    focusProject = _useState78[0],
+    setFocusProject = _useState78[1];
+  const _useState79 = useState(null),
+    _useState80 = _slicedToArray(_useState79, 2),
+    modal = _useState80[0],
+    setModal = _useState80[1];
+  const goMap = p => {
+    setFocusProject(p);
+    setPage("map");
+  };
+
+  // Trigger the Phase-2 AI experience for any project
+  const startGeneration = p => {
+    setGenProject(p || {
+      name: "Raipur → Durg Corridor"
+    });
+    setWorking(true);
+  };
+  const handleNewProjectSubmit = async data => {
+    const created = await apiPost("/api/projects", data, _objectSpread(_objectSpread({}, data), {}, {
+      length_km: 0,
+      cost_cr: 0,
+      cost_saved_cr: 0
+    }));
+    startGeneration(created);
+  };
+  if (!user) return /*#__PURE__*/React.createElement(Login, {
+    onLogin: u => {
+      setUser(u);
+      setPage("dashboard");
+    }
+  });
+  return /*#__PURE__*/React.createElement("div", {
+    className: "flex bg-slate-100 min-h-screen"
+  }, /*#__PURE__*/React.createElement(Sidebar, {
+    page: page,
+    setPage: p => {
+      setPage(p);
+    },
+    user: user,
+    onLogout: () => setUser(null)
+  }), /*#__PURE__*/React.createElement("main", {
+    className: "flex-1 p-6 max-w-[1500px]"
+  }, page === "dashboard" && /*#__PURE__*/React.createElement(Dashboard, {
+    setPage: setPage,
+    openProject: p => setModal(p),
+    onGenerate: startGeneration
+  }), page === "newproject" && /*#__PURE__*/React.createElement(NewProject, {
+    setPage: setPage,
+    onGenerate: handleNewProjectSubmit
+  }), page === "map" && /*#__PURE__*/React.createElement(MapViewer, {
+    key: (focusProject === null || focusProject === void 0 ? void 0 : focusProject.id) || "def",
+    focusProject: focusProject
+  }), page === "routes" && /*#__PURE__*/React.createElement(RouteAnalysis, {
+    openProject: p => setModal(p),
+    onMap: goMap,
+    onGenerate: startGeneration
+  }), page === "results" && /*#__PURE__*/React.createElement(RouteResults, {
+    project: genProject,
+    onBack: () => setPage("routes")
+  }), page === "dpr" && /*#__PURE__*/React.createElement(DPRGenerator, null)), working && /*#__PURE__*/React.createElement(AIWorkingOverlay, {
+    project: genProject,
+    onDone: () => {
+      setWorking(false);
+      setPage("results");
+    }
+  }), /*#__PURE__*/React.createElement(ProjectModal, {
+    project: modal,
+    onClose: () => setModal(null),
+    onMap: goMap,
+    onGenerate: startGeneration
+  }));
+}
+ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/React.createElement(App, null));
+</script>
+</body>
+</html>
